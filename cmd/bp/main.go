@@ -56,6 +56,9 @@ func completeURL(addr string) (u string, err error) {
 	}
 	u = addr
 	if !strings.HasPrefix(u, "http://") {
+		if !strings.Contains(u, ":") {
+			u = u + ":80"
+		}
 		host, port, err := net.SplitHostPort(u)
 		if err != nil {
 			return "", err
