@@ -13,7 +13,7 @@ import (
 
 var (
 	addr   string
-	proxy  string
+	target string
 	server bool
 	client bool
 	check  bool
@@ -26,12 +26,12 @@ var session io.ReadWriteCloser
 var (
 	errFast  = errors.New("bp: -fast cannot be used without -server or -client")
 	errHttps = errors.New("bp cannot into https :( [https://github.com/rjecza" +
-		"lik/blackproxy/issues/1")
+		"lik/blacktarget/issues/1")
 	errTimedReplyNotImpl = errors.New("bp: -fast=false not implemented :( " +
-		"https://github.com/rjeczalik/blackproxy/issues/2")
+		"https://github.com/rjeczalik/blacktarget/issues/2")
 	errSessionFile = errors.New("bp: expected session file path as a single" +
 		" argument")
-	errRecordReply = errors.New("bp: -proxy cannot be mixed with -fast, -se" +
+	errRecordReply = errors.New("bp: -target cannot be mixed with -fast, -se" +
 		"rver or -client")
 	errServerClient = errors.New("bp: one of -server or -client is required")
 	errAmbiguous    = errors.New("bp: only one of -server and -client can be " +
@@ -39,13 +39,13 @@ var (
 )
 
 func init() {
-	flag.StringVar(&addr, "addr", ":8080", "HTTP service address")
-	flag.StringVar(&proxy, "proxy", "", "remote HTTP service address")
-	flag.BoolVar(&server, "server", false, "reply session acting as a server")
-	flag.BoolVar(&client, "client", false, "reply session acting as a client")
+	flag.StringVar(&addr, "addr", ":8080", "")
+	flag.StringVar(&target, "target", "", "")
+	flag.BoolVar(&server, "server", false, "")
+	flag.BoolVar(&client, "client", false, "")
 	// TODO reply time diff between request when -fast=false
-	flag.BoolVar(&fast, "fast", false, "reply requests")
-	flag.BoolVar(&help, "help", false, "print usage information")
+	flag.BoolVar(&fast, "fast", false, "")
+	flag.BoolVar(&help, "help", false, "")
 	flag.Parse()
 }
 
@@ -88,11 +88,11 @@ func validate() (err error) {
 	if addr, err = completeURL(addr); err != nil {
 		return
 	}
-	if proxy != "" {
+	if target != "" {
 		if server || client || fast {
 			return errRecordReply
 		}
-		if proxy, err = completeURL(proxy); err != nil {
+		if target, err = completeURL(target); err != nil {
 			return
 		}
 	} else if !server && !client {
@@ -117,9 +117,9 @@ func main() {
 
 RECORD OPTIONS:
 
-  -addr   HTTP reverse proxy address (default is http://localhost:8080)
+  -addr    HTTP reverse proxy address (default is http://localhost:8080)
 
-  -proxy  HTTP service address to be proxied to
+  -target  HTTP target service address
 
 REPLY OPTIONS:
 
