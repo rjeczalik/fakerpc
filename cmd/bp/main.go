@@ -5,10 +5,14 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/url"
 	"os"
+	"os/signal"
 	"strings"
+
+	"github.com/rjeczalik/blackproxy"
 )
 
 var (
@@ -21,33 +25,49 @@ var (
 	help   bool
 )
 
-var session io.ReadWriteCloser
+var (
+	session io.ReadWriteCloser
+	cleanup = make(chan func() error, 1)
+)
 
 var (
-	errFast  = errors.New("bp: -fast cannot be used without -server or -client")
-	errHttps = errors.New("bp cannot into https :( [https://github.com/rjecza" +
-		"lik/blacktarget/issues/1")
-	errTimedReplyNotImpl = errors.New("bp: -fast=false not implemented :( " +
-		"https://github.com/rjeczalik/blacktarget/issues/2")
-	errSessionFile = errors.New("bp: expected session file path as a single" +
+	errFast  = errors.New("-fast cannot be used without -server or -client")
+	errHttps = errors.New("cannot into https :( [https://github.com/rjecza" +
+		"lik/blackproxy/issues/1]")
+	errTimedReplyNotImpl = errors.New("-fast=false not implemented :( " +
+		"[https://github.com/rjeczalik/blackproxy/issues/2]")
+	errSessionFile = errors.New("expected session file path as a single" +
 		" argument")
-	errRecordReply = errors.New("bp: -target cannot be mixed with -fast, -se" +
+	errRecordReply = errors.New("-target cannot be mixed with -fast, -se" +
 		"rver or -client")
-	errServerClient = errors.New("bp: one of -server or -client is required")
-	errAmbiguous    = errors.New("bp: only one of -server and -client can be " +
+	errServerClient = errors.New("one of -server or -client is required")
+	errAmbiguous    = errors.New("only one of -server and -client can be " +
 		"specified at once")
 )
 
-func init() {
-	flag.StringVar(&addr, "addr", ":8080", "")
-	flag.StringVar(&target, "target", "", "")
-	flag.BoolVar(&server, "server", false, "")
-	flag.BoolVar(&client, "client", false, "")
-	// TODO reply time diff between request when -fast=false
-	flag.BoolVar(&fast, "fast", false, "")
-	flag.BoolVar(&help, "help", false, "")
-	flag.Parse()
-}
+const usage = `usage: bp [-help | [[RECORD OPTIONS | REPLY OPTIONS] session_file]
+
+  session_file  requests are written to this file when recording or read when
+                replying
+
+  -help         print usage information
+
+RECORD OPTIONS:
+
+  -addr    HTTP reverse proxy address (default is http://localhost:8080)
+
+  -target  HTTP target service address
+
+REPLY OPTIONS:
+
+  -addr    HTTP service address
+
+  -client  reply session acting as a client; requests are sent to -addr
+
+  -server  reply session acting as a server; server listens on -addr
+
+  -fast    issues requests immadiately without replying time diff between them
+`
 
 func completeURL(addr string) (u string, err error) {
 	if strings.HasPrefix(addr, "https://") {
@@ -85,7 +105,7 @@ func validate() (err error) {
 	if server && client {
 		return errAmbiguous
 	}
-	if addr, err = completeURL(addr); err != nil {
+	if _, _, err = net.SplitHostPort(addr); err != nil {
 		return
 	}
 	if target != "" {
@@ -106,36 +126,70 @@ func validate() (err error) {
 	return
 }
 
+func sighandler(ch <-chan os.Signal) {
+	if _, ok := <-ch; ok {
+		select {
+		case clfn, ok := <-cleanup:
+			if !ok {
+				return
+			}
+			log.Println("Interrupted, cleaning up . . .")
+			if err := clfn(); err == nil {
+				// TODO push interrupt.Server to rjeczalik/netutil and use it
+				//      instead of http.ListenAndServe; this is crucial to stop
+				//      HTTP server first and then allow dumper to finish gracefully
+				os.Exit(0)
+			} else {
+				fatal(err)
+			}
+		default:
+			os.Exit(0)
+		}
+	}
+}
+
+func fatal(err error) {
+	fmt.Fprintf(os.Stderr, "bp: %s\n", err)
+	os.Exit(1)
+}
+
+func init() {
+	// interrupt handling
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, os.Interrupt, os.Kill)
+	go sighandler(ch)
+	// command line handling
+	flag.StringVar(&addr, "addr", ":8080", "")
+	flag.StringVar(&target, "target", "", "")
+	flag.BoolVar(&server, "server", false, "")
+	flag.BoolVar(&client, "client", false, "")
+	flag.BoolVar(&fast, "fast", false, "")
+	flag.BoolVar(&help, "help", false, "")
+	flag.Parse()
+}
+
 func main() {
 	if help {
-		fmt.Println(`usage: bp [-help | [[RECORD OPTIONS | REPLY OPTIONS] session_file]
-
-  session_file  requests are written to this file when recording or read when
-                replying
-
-  -help         print usage information
-
-RECORD OPTIONS:
-
-  -addr    HTTP reverse proxy address (default is http://localhost:8080)
-
-  -target  HTTP target service address
-
-REPLY OPTIONS:
-
-  -addr    HTTP service address
-
-  -client  reply session acting as a client; requests are sent to -addr
-
-  -server  reply session acting as a server; server listens on -addr
-
-  -fast    issues requests immadiately without replying time diff between them
-`)
+		fmt.Println(usage)
 		return
 	}
 	if err := validate(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		fatal(err)
 	}
-	// TODO
+	// record mode
+	if target != "" {
+		rp := black.NewRecordingProxy(session)
+		cleanup <- func() error { return rp.Close() }
+		log.Println("Recording proxy session", addr, "<->", target, "to", flag.Arg(0), ". . .")
+		if err := rp.ListenAndServe(addr, target); err != nil {
+			fatal(err)
+		}
+	}
+	// reply mode
+	switch {
+	case server:
+		// TODO
+	case client:
+		// TODO
+	}
 }
