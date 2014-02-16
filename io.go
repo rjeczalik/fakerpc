@@ -5,23 +5,17 @@ import (
 	"io"
 )
 
-// ListeningBuffer is a bytes.Buffer that implements io.Closer as a slice of
-// callbacks.
+// ListeningBuffer is a bytes.Buffer that implements io.Closer as a callback.
 type ClosingBuffer struct {
 	bytes.Buffer
-	onClose func()
-}
-
-// NewBuffer creates empty buffers with onclose callback.
-func NewClosingBuffer(onclose func()) *ClosingBuffer {
-	return &ClosingBuffer{
-		onClose: onclose,
-	}
+	OnClose func()
 }
 
 // Close invokes onclose callback.
 func (cb *ClosingBuffer) Close() (err error) {
-	cb.onClose()
+	if cb.OnClose != nil {
+		cb.OnClose()
+	}
 	return
 }
 

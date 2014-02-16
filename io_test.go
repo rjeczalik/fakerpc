@@ -9,11 +9,14 @@ import (
 
 func TestClosingBuffer(t *testing.T) {
 	closed := false
-	if err := NewClosingBuffer(func() { closed = true }).Close(); err != nil {
+	if err := (&ClosingBuffer{OnClose: func() { closed = true }}).Close(); err != nil {
 		t.Errorf("expected err to be nil, was %q instead", err)
 	}
 	if !closed {
 		t.Error("expected closed to be true")
+	}
+	if err := new(ClosingBuffer).Close(); err != nil {
+		t.Errorf("expected err to be nil, was %q instead", err)
 	}
 }
 
@@ -24,9 +27,9 @@ func (dc *dummyCloser) Close() error { return dc.err }
 func TestMultiCloser(t *testing.T) {
 	closed, errClose := []bool{false, false}, errors.New("close")
 	closers := []io.Closer{
-		NewClosingBuffer(func() { closed[0] = true }),
+		&ClosingBuffer{OnClose: func() { closed[0] = true }},
 		&dummyCloser{errClose},
-		NewClosingBuffer(func() { closed[1] = true }),
+		&ClosingBuffer{OnClose: func() { closed[1] = true }},
 	}
 	if err := MultiCloser(closers...).Close(); err == nil || err != errClose {
 		t.Errorf("expected err to be %q, was %q instead", errClose, err)
@@ -40,7 +43,7 @@ func TestMultiCloser(t *testing.T) {
 
 func TestTeeReadCloser(t *testing.T) {
 	closed, src, errClose := false, []byte("hello world"), errors.New("close")
-	rb, wb := NewClosingBuffer(func() { closed = true }), new(bytes.Buffer)
+	rb, wb := &ClosingBuffer{OnClose: func() { closed = true }}, new(bytes.Buffer)
 	rb.Write(src)
 	dst := make([]byte, len(src))
 	r := TeeReadCloser(rb, wb)
