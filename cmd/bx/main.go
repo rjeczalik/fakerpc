@@ -12,8 +12,6 @@ import (
 	"github.com/rjeczalik/blackproxy"
 )
 
-const ver = "0.1"
-
 var (
 	addr   string
 	client string
@@ -45,7 +43,7 @@ func parse() (run black.RunCloser, err error) {
 	if addr != ":0" && !isproxy {
 		log.Printf("ignoring -addr=%q", addr)
 	}
-	f := os.O_CREATE
+	f := os.O_CREATE | os.O_WRONLY
 	if isclient || isserver {
 		f = os.O_RDONLY
 	}
@@ -67,9 +65,13 @@ func handlesig(c io.Closer) {
 	ch, once := make(chan os.Signal, 1), sync.Once{}
 	signal.Notify(ch, os.Interrupt, os.Kill)
 	go func() {
-		for _ = range ch {
+		for sig := range ch {
+			log.Printf("received signal %d", sig)
 			once.Do(func() {
-				if err := c.Close; err != nil {
+				if err := c.Close(); err != nil {
+					log.Println(err)
+				}
+				if err := file.Close(); err != nil {
 					log.Println(err)
 				}
 			})
@@ -85,11 +87,14 @@ func init() {
 }
 
 func main() {
+	if len(os.Args) == 1 {
+		flag.Usage()
+		os.Exit(1)
+	}
 	run, err := parse()
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("bx v%s starting up . . .", ver)
 	handlesig(run)
 	if err = run.Run(); err != nil {
 		log.Fatal(err)
