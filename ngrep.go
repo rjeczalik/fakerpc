@@ -10,20 +10,6 @@ import (
 	"strconv"
 )
 
-// Transmission TODO(rjeczalik): document
-type Transmission struct {
-	Src net.TCPAddr
-	Dst net.TCPAddr
-	Raw []byte
-}
-
-// Log TODO(rjeczalik): document
-type Log struct {
-	Network net.IPNet
-	Filter  string
-	T       []Transmission
-}
-
 var (
 	headre = [...]*regexp.Regexp{
 		regexp.MustCompile(`interface: [\w\d]+ \(([\.:\w\d]+)\/([\.:\w\d]+)\)`),
@@ -31,6 +17,24 @@ var (
 	}
 	tre = regexp.MustCompile(`T ([\.:\w\d]+) -> ([\.:\w\d]+)`)
 )
+
+func parseAddr(s string) (addr *net.TCPAddr, err error) {
+	host, port, err := net.SplitHostPort(s)
+	if err != nil {
+		return
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		err = fmt.Errorf("invalid IP: %s", host)
+		return
+	}
+	p, err := strconv.Atoi(port)
+	if err != nil {
+		return
+	}
+	addr = &net.TCPAddr{IP: ip, Port: p}
+	return
+}
 
 // ParseNgrep TODO(rjeczalik): document
 func ParseNgrep(r io.Reader) (*Log, error) {
@@ -98,22 +102,4 @@ func ParseNgrep(r io.Reader) (*Log, error) {
 			}
 		}
 	}
-}
-
-func parseAddr(s string) (addr net.TCPAddr, err error) {
-	host, port, err := net.SplitHostPort(s)
-	if err != nil {
-		return
-	}
-	ip := net.ParseIP(host)
-	if ip == nil {
-		err = fmt.Errorf("invalid IP: %s", host)
-		return
-	}
-	p, err := strconv.Atoi(port)
-	if err != nil {
-		return
-	}
-	addr = net.TCPAddr{IP: ip, Port: p}
-	return
 }

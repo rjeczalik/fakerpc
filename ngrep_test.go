@@ -51,91 +51,91 @@ var lexp = &Log{
 	},
 	Filter: "(ip or ip6) and ( host 192.168.16.50 and port 80 )",
 	T: []Transmission{{
-		Src: net.TCPAddr{
+		Src: &net.TCPAddr{
 			IP:   net.IPv4(192, 168, 14, 108),
 			Port: 46793,
 		},
-		Dst: net.TCPAddr{
+		Dst: &net.TCPAddr{
 			IP:   net.IPv4(192, 168, 16, 50),
 			Port: 80,
 		},
 		Raw: []byte("REQ\r\nUE\r\nST\n"),
 	}, {
-		Src: net.TCPAddr{
+		Src: &net.TCPAddr{
 			IP:   net.IPv4(192, 168, 16, 50),
 			Port: 80,
 		},
-		Dst: net.TCPAddr{
+		Dst: &net.TCPAddr{
 			IP:   net.IPv4(192, 168, 14, 108),
 			Port: 46793,
 		},
 		Raw: []byte("RES\r\nPONSE\n"),
 	}, {
-		Src: net.TCPAddr{
+		Src: &net.TCPAddr{
 			IP:   net.IPv4(192, 168, 14, 108),
 			Port: 46794,
 		},
-		Dst: net.TCPAddr{
+		Dst: &net.TCPAddr{
 			IP:   net.IPv4(192, 168, 16, 50),
 			Port: 80,
 		},
 		Raw: []byte("REQUEST\r\n"),
 	}, {
-		Src: net.TCPAddr{
+		Src: &net.TCPAddr{
 			IP:   net.IPv4(192, 168, 14, 108),
 			Port: 46794,
 		},
-		Dst: net.TCPAddr{
+		Dst: &net.TCPAddr{
 			IP:   net.IPv4(192, 168, 16, 50),
 			Port: 80,
 		},
 		Raw: []byte("MORE\r\n"),
 	}, {
-		Src: net.TCPAddr{
+		Src: &net.TCPAddr{
 			IP:   net.IPv4(192, 168, 16, 50),
 			Port: 80,
 		},
-		Dst: net.TCPAddr{
+		Dst: &net.TCPAddr{
 			IP:   net.IPv4(192, 168, 14, 108),
 			Port: 46794,
 		},
 		Raw: []byte("RES\r\nPON\r\nSE\n"),
 	}, {
-		Src: net.TCPAddr{
+		Src: &net.TCPAddr{
 			IP:   net.IPv4(192, 168, 14, 108),
 			Port: 46794,
 		},
-		Dst: net.TCPAddr{
+		Dst: &net.TCPAddr{
 			IP:   net.IPv4(192, 168, 16, 50),
 			Port: 80,
 		},
 		Raw: []byte("KTHXBAI\n"),
 	}, {
-		Src: net.TCPAddr{
+		Src: &net.TCPAddr{
 			IP:   net.IPv4(192, 168, 14, 108),
 			Port: 46795,
 		},
-		Dst: net.TCPAddr{
+		Dst: &net.TCPAddr{
 			IP:   net.IPv4(192, 168, 16, 50),
 			Port: 80,
 		},
 		Raw: []byte("LAST\r\nONE\n"),
 	}, {
-		Src: net.TCPAddr{
+		Src: &net.TCPAddr{
 			IP:   net.IPv4(192, 168, 16, 50),
 			Port: 80,
 		},
-		Dst: net.TCPAddr{
+		Dst: &net.TCPAddr{
 			IP:   net.IPv4(192, 168, 14, 108),
 			Port: 46795,
 		},
 		Raw: []byte("KK\n"),
 	}, {
-		Src: net.TCPAddr{
+		Src: &net.TCPAddr{
 			IP:   net.IPv4(192, 168, 14, 108),
 			Port: 46795,
 		},
-		Dst: net.TCPAddr{
+		Dst: &net.TCPAddr{
 			IP:   net.IPv4(192, 168, 16, 50),
 			Port: 80,
 		},
