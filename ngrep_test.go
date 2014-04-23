@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-const ngrep = `interface: tun0 (192.168.14.0/255.255.255.0)
+var ngrep = []byte(`interface: dunno0 (192.168.14.0/255.255.255.0)
 filter: (ip or ip6) and ( host 192.168.16.50 and port 80 )
 
 T 192.168.14.108:46793 -> 192.168.16.50:80 [AP]
@@ -42,7 +42,7 @@ KK
 
 T 192.168.14.108:46795 -> 192.168.16.50:80 [AP]
 I.
-LIED`
+LIED`)
 
 var lexp = &Log{
 	Network: net.IPNet{
@@ -143,9 +143,9 @@ var lexp = &Log{
 	}},
 }
 
-func TestParseNgrep(t *testing.T) {
-	l, err := ParseNgrep(bytes.NewBufferString(ngrep))
-	if err != nil {
+func TestNgrepUnmarshal(t *testing.T) {
+	l := NewLog()
+	if err := NgrepUnmarshal(bytes.NewBuffer(ngrep), l); err != nil {
 		t.Fatalf("expected err=nil; was %q", err)
 	}
 	if !l.Network.IP.Equal(lexp.Network.IP) {
@@ -169,5 +169,18 @@ func TestParseNgrep(t *testing.T) {
 		if !bytes.Equal(l.T[i].Raw, lexp.T[i].Raw) {
 			t.Errorf("expected l.T[%d].Raw=%q; was %q", i, lexp.T[i].Raw, l.T[i].Raw)
 		}
+	}
+}
+func TestNgrepMarshal(t *testing.T) {
+	var buf bytes.Buffer
+	if err := NgrepMarshal(&buf, lexp); err != nil {
+		t.Errorf("expected err=nil; was err=%q", err)
+	}
+	b := buf.Bytes()
+	if len(b) != len(ngrep) {
+		t.Errorf("expected len(b)=%d; was err=%d", len(ngrep), len(b))
+	}
+	if !bytes.Equal(b, ngrep) {
+		t.Errorf("expected b=%q; was b=%q", ngrep, b)
 	}
 }

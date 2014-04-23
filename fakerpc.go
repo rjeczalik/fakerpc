@@ -3,9 +3,17 @@ package fakerpc
 import (
 	"bufio"
 	"bytes"
+	"errors"
+	"fmt"
 	"net"
 	"net/http"
 )
+
+// ErrAlreadyRunning TODO(rjeczalik): document
+var ErrAlreadyRunning = errors.New("fakerpc: server is already running")
+
+// ErrNotRunning TODO(rjeczalik): document
+var ErrNotRunning = errors.New("fakerpc: server is not running")
 
 // Transmission TODO(rjeczalik): document
 type Transmission struct {
@@ -19,6 +27,33 @@ type Log struct {
 	Network net.IPNet
 	Filter  string
 	T       []Transmission
+}
+
+// NetIP TODO(rjeczalik): document
+func (l *Log) NetIP() net.IP {
+	return ipnull(l.Network.IP)
+}
+
+// NetMask TODO(rjeczalik): document
+func (l *Log) NetMask() net.IP {
+	return masktoip(l.Network.Mask)
+}
+
+// NetFilter TODO(rjeczalik): document
+func (l *Log) NetFilter() string {
+	if l.Filter != "" {
+		return l.Filter
+	}
+	if len(l.T) == 0 {
+		return "(none)"
+	}
+	return fmt.Sprintf("(ip or ipv6) and ( host %s and port %d )",
+		l.T[0].Dst.IP, l.T[0].Dst.Port)
+}
+
+// NewLog TODO(rjeczalik): document
+func NewLog() *Log {
+	return &Log{T: make([]Transmission, 0)}
 }
 
 // Connection TODO(rjeczalik): document

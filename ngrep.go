@@ -2,6 +2,7 @@ package fakerpc
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -36,8 +37,27 @@ func parseAddr(s string) (addr *net.TCPAddr, err error) {
 	return
 }
 
-// ParseNgrep TODO(rjeczalik): document
-func ParseNgrep(r io.Reader) (*Log, error) {
+func ipnull(ip net.IP) net.IP {
+	if ip == nil {
+		return net.IPv4(0, 0, 0, 0)
+	}
+	return ip
+}
+
+func iptomask(ip net.IP) net.IPMask {
+	ip = ipnull(ip)
+	return net.IPv4Mask(ip[12], ip[13], ip[14], ip[15])
+}
+
+func masktoip(mask net.IPMask) (ip net.IP) {
+	if mask != nil {
+		ip = net.IPv4(mask[0], mask[1], mask[2], mask[3])
+	}
+	return ipnull(ip)
+}
+
+// NgrepUnmarshal TODO(rjeczalik): document
+func NgrepUnmarshal(r io.Reader, l *Log) error {
 	type state uint8
 	const (
 		stHead state = iota
@@ -46,7 +66,6 @@ func ParseNgrep(r io.Reader) (*Log, error) {
 	)
 	var (
 		t   *Transmission
-		l   = &Log{T: make([]Transmission, 0)}
 		buf = bufio.NewReader(r)
 		st  = stHead
 	)
@@ -54,10 +73,10 @@ func ParseNgrep(r io.Reader) (*Log, error) {
 		b, err := buf.ReadBytes('\n')
 		if len(b) == 0 {
 			if err == io.EOF {
-				return l, nil
+				return nil
 			}
 			if err != nil {
-				return nil, err
+				return err
 			}
 		}
 		switch st {
@@ -75,10 +94,10 @@ func ParseNgrep(r io.Reader) (*Log, error) {
 				l.T = append(l.T, Transmission{})
 				t = &l.T[len(l.T)-1]
 				if t.Src, err = parseAddr(m[1]); err != nil {
-					return nil, err
+					return err
 				}
 				if t.Dst, err = parseAddr(m[2]); err != nil {
-					return nil, err
+					return err
 				}
 				st = stRaw
 			}
@@ -90,16 +109,56 @@ func ParseNgrep(r io.Reader) (*Log, error) {
 			line := string(b)
 			if m := headre[0].FindStringSubmatch(line); m != nil {
 				if l.Network.IP = net.ParseIP(m[1]); l.Network.IP == nil {
-					return nil, errors.New("ill-formed IP " + m[1])
+					return errors.New("ill-formed IP " + m[1])
 				}
 				mask := net.ParseIP(m[2])
 				if mask == nil {
-					return nil, errors.New("ill-formed IP mask " + m[2])
+					return errors.New("ill-formed IP mask " + m[2])
 				}
-				l.Network.Mask = net.IPv4Mask(mask[12], mask[13], mask[14], mask[15])
+				l.Network.Mask = iptomask(mask)
 			} else if m := headre[1].FindStringSubmatch(line); m != nil {
 				l.Filter = m[1]
 			}
 		}
 	}
+}
+
+// NgrepMarshal TODO(rjeczalik): document
+func NgrepMarshal(w io.Writer, l *Log) (err error) {
+	_, err = fmt.Fprintf(w, "interface: dunno0 (%s/%s)\n", l.NetIP(), l.NetMask())
+	if err != nil {
+		return
+	}
+	if _, err = fmt.Fprintf(w, "filter: %s\n", l.NetFilter()); err != nil {
+		return
+	}
+	for i := range l.T {
+		_, err = fmt.Fprintf(w, "\nT %s -> %s [AP]\n", l.T[i].Src.String(), l.T[i].Dst.String())
+		if err != nil {
+			return
+		}
+		var (
+			b []byte
+			r = bufio.NewReader(bytes.NewBuffer(l.T[i].Raw))
+		)
+		for {
+			b, err = r.ReadBytes('\n')
+			if len(b) == 0 {
+				if err == io.EOF {
+					err = nil
+					break
+				}
+				if err != nil {
+					return
+				}
+			}
+			if len(b) > 1 && b[len(b)-2] == '\r' {
+				b[len(b)-2] = '.'
+			}
+			if _, err = fmt.Fprintf(w, "%s", b); err != nil {
+				return
+			}
+		}
+	}
+	return
 }
