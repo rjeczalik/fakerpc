@@ -92,6 +92,7 @@ func NewServer(addr string, log *Log) (srv *Server, err error) {
 // ListenAndServe TODO(rjeczalik): document
 func (srv *Server) ListenAndServe() (err error) {
 	if atomic.CompareAndSwapUint32(&srv.isrun, 0, 1) {
+		srv.m.Lock()
 		defer func() {
 			// Ignore "use of closed network connection" comming from closed
 			// net.Listener when p was explicitely stopped.
@@ -99,7 +100,6 @@ func (srv *Server) ListenAndServe() (err error) {
 				err = nil
 			}
 		}()
-		srv.m.Lock()
 		if srv.l, err = net.Listen("tcp", srv.addr); err != nil {
 			srv.m.Unlock()
 			return
@@ -150,7 +150,7 @@ func (srv *Server) Stop() (err error) {
 
 // Addr TODO(rjeczalik): document
 func (srv *Server) Addr() (addr net.Addr) {
-	if atomic.LoadUint32(&srv.isrun) == 1 {
+	if srv.Running() {
 		srv.m.Lock()
 		addr = srv.l.Addr()
 		srv.m.Unlock()

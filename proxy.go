@@ -1,7 +1,6 @@
 package fakerpc
 
 import (
-	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -149,11 +148,6 @@ func (rl *recListener) Accept() (c net.Conn, err error) {
 			rl.m.Lock()
 			rl.log.T = append(rl.log.T, t...)
 			rl.m.Unlock()
-			for i := range t {
-				header, body := SplitHTTP(t[i].Raw)
-				log.Printf("t[%d]:\nHEADER (len=%d):\n{%s}\n\nBODY (len=%d):\n{%s}\n\n",
-					i, len(header), string(header), len(body), string(body))
-			}
 		},
 		src: rl.src,
 		dst: dst,

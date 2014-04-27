@@ -2,9 +2,7 @@ package cli
 
 import (
 	"bytes"
-	"encoding/gob"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"os"
@@ -67,13 +65,13 @@ func NewCLI() *CLI {
 		cli.StringFlag{Name: "log", Value: logfile(), Usage: "A path to the log file (or ngrep output)"},
 	}
 	cl.app.Commands = []cli.Command{{
-		Name:   "proxy",
+		Name:   "record",
 		Usage:  "Record all transmission going through proxy",
-		Action: cl.Proxy,
+		Action: cl.Record,
 	}, {
-		Name:   "server",
+		Name:   "reply",
 		Usage:  "Reply recorded transmissions",
-		Action: cl.Server,
+		Action: cl.Reply,
 	}, {
 		Name:   "show",
 		Usage:  "Show log as ngrep output",
@@ -82,39 +80,11 @@ func NewCLI() *CLI {
 	return cl
 }
 
-// ReadLog TODO(rjeczalik): document
-func ReadLog(file string) (l *fakerpc.Log, err error) {
-	f, err := os.Open(file)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-	var buf bytes.Buffer
-	l = fakerpc.NewLog()
-	r := io.TeeReader(f, &buf)
-	dec := gob.NewDecoder(r)
-	if err = dec.Decode(l); err == nil {
-		return
-	}
-	err = fakerpc.NgrepUnmarshal(bytes.NewBuffer(buf.Bytes()), l)
-	return
-}
-
-// WriteLog TODO(rjeczalik): document
-func WriteLog(file string, log *fakerpc.Log) error {
-	f, err := os.OpenFile(file, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	if err != nil {
-		return err
-	}
-	enc := gob.NewEncoder(f)
-	return enc.Encode(log)
-}
-
 // Proxy TODO(rjeczalik): document
-func (cl *CLI) Proxy(ctx *cli.Context) {
+func (cl *CLI) Record(ctx *cli.Context) {
 	target := ctx.Args().First()
 	if target == "" {
-		cl.Err("fakerpc: missing (...) proxy <target url>")
+		cl.Err("fakerpc: missing (...) record <proxy target url>")
 		cl.Exit(1)
 	}
 	p, err := fakerpc.NewProxy(ctx.GlobalString("addr"), target)
@@ -136,7 +106,7 @@ func (cl *CLI) Proxy(ctx *cli.Context) {
 	signal.Notify(sig, os.Interrupt, os.Kill)
 	for !p.Running() {
 	}
-	cl.Out(fmt.Sprintf("fakerpc: Proxy records on %s . . .", p.Addr()))
+	cl.Out(fmt.Sprintf("fakerpc: Proxy recording on %s . . .", p.Addr()))
 	<-sig
 	cl.Out("fakerpc: Signal caught; stopping proxy . . .")
 	log, err := p.Stop()
@@ -147,15 +117,15 @@ func (cl *CLI) Proxy(ctx *cli.Context) {
 	<-done
 	logFile := ctx.GlobalString("log")
 	cl.Out(fmt.Sprintf("fakerpc: Saving log to the %q file . . .", logFile))
-	if err = WriteLog(logFile, log); err != nil {
+	if err = fakerpc.WriteLog(logFile, log); err != nil {
 		cl.Err(err)
 		cl.Exit(1)
 	}
 }
 
 // Server TODO(rjeczalik): document
-func (cl *CLI) Server(ctx *cli.Context) {
-	l, err := ReadLog(ctx.GlobalString("log"))
+func (cl *CLI) Reply(ctx *cli.Context) {
+	l, err := fakerpc.ReadLog(ctx.GlobalString("log"))
 	if err != nil {
 		cl.Err(err)
 		cl.Exit(1)
@@ -182,13 +152,13 @@ func (cl *CLI) Server(ctx *cli.Context) {
 	}()
 	for !s.Running() {
 	}
-	cl.Out(fmt.Sprintf("fakerpc: Serving on %s . . .", s.Addr()))
+	cl.Out(fmt.Sprintf("fakerpc: Server replying on %s . . .", s.Addr()))
 	<-done
 }
 
 // Show TODO(rjeczalik): document
 func (cl *CLI) Show(ctx *cli.Context) {
-	l, err := ReadLog(ctx.GlobalString("log"))
+	l, err := fakerpc.ReadLog(ctx.GlobalString("log"))
 	if err != nil {
 		cl.Err(err)
 		cl.Exit(1)

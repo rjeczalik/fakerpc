@@ -52,7 +52,7 @@ func mul(p []byte, n int) []byte {
 
 func TestProxy(t *testing.T) {
 	addr := httpsrv(t)
-	p, err := NewProxy("http://"+addr, ":0")
+	p, err := NewProxy(":0", "http://"+addr)
 	if err != nil {
 		t.Fatalf("expected err=nil; got err=%q", err)
 	}

@@ -3,10 +3,13 @@ package fakerpc
 import (
 	"bufio"
 	"bytes"
+	"encoding/gob"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"os"
 )
 
 // ErrAlreadyRunning TODO(rjeczalik): document
@@ -54,6 +57,35 @@ func (l *Log) NetFilter() string {
 // NewLog TODO(rjeczalik): document
 func NewLog() *Log {
 	return &Log{T: make([]Transmission, 0)}
+}
+
+// ReadLog TODO(rjeczalik): document
+func ReadLog(file string) (l *Log, err error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	var buf bytes.Buffer
+	l = NewLog()
+	r := io.TeeReader(f, &buf)
+	dec := gob.NewDecoder(r)
+	if err = dec.Decode(l); err == nil {
+		return
+	}
+	err = NgrepUnmarshal(bytes.NewBuffer(buf.Bytes()), l)
+	return
+}
+
+// WriteLog TODO(rjeczalik): document
+func WriteLog(file string, log *Log) error {
+	f, err := os.OpenFile(file, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	enc := gob.NewEncoder(f)
+	return enc.Encode(log)
 }
 
 // Connection TODO(rjeczalik): document
