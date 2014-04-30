@@ -45,8 +45,7 @@ func Fixture(t *testing.T) (addr string, teardown func()) {
 				t.Fatal("fakerpc: proxy error:", err)
 			}
 		}()
-		for !p.Running() {
-		}
+		p.Wait()
 		addr = "http://" + p.Addr().String()
 		teardown = func() {
 			l, err := p.Stop()
@@ -76,8 +75,7 @@ func Fixture(t *testing.T) (addr string, teardown func()) {
 				t.Fatal("fakerpc: server error:", err)
 			}
 		}()
-		for !srv.Running() {
-		}
+		srv.Wait()
 		addr, teardown = "http://"+srv.Addr().String(), func() { srv.Stop() }
 	}
 	return

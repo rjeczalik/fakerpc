@@ -104,8 +104,7 @@ func (cl *CLI) Record(ctx *cli.Context) {
 		close(done)
 	}()
 	signal.Notify(sig, os.Interrupt, os.Kill)
-	for !p.Running() {
-	}
+	p.Wait()
 	cl.Out(fmt.Sprintf("fakerpc: Proxy recording on %s . . .", p.Addr()))
 	<-sig
 	cl.Out("fakerpc: Signal caught; stopping proxy . . .")
@@ -130,12 +129,12 @@ func (cl *CLI) Reply(ctx *cli.Context) {
 		cl.Err(err)
 		cl.Exit(1)
 	}
-	s, err := fakerpc.NewServer(ctx.GlobalString("addr"), l)
+	srv, err := fakerpc.NewServer(ctx.GlobalString("addr"), l)
 	if err != nil {
 		cl.Err(err)
 		cl.Exit(1)
 	}
-	s.Reply = func(src, dst *net.TCPAddr, n int64, err error) {
+	srv.Reply = func(src, dst *net.TCPAddr, n int64, err error) {
 		if err != nil {
 			cl.Err(fmt.Sprintf("fakerpc: T %s -> %s (%d) error: %v", src, dst, n, err))
 		} else {
@@ -144,15 +143,14 @@ func (cl *CLI) Reply(ctx *cli.Context) {
 	}
 	done := make(chan struct{})
 	go func() {
-		if err := s.ListenAndServe(); err != nil {
+		if err := srv.ListenAndServe(); err != nil {
 			cl.Err(err)
 			cl.Exit(1)
 		}
 		close(done)
 	}()
-	for !s.Running() {
-	}
-	cl.Out(fmt.Sprintf("fakerpc: Server replying on %s . . .", s.Addr()))
+	srv.Wait()
+	cl.Out(fmt.Sprintf("fakerpc: Server replying on %s . . .", srv.Addr()))
 	<-done
 }
 

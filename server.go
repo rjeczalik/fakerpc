@@ -15,19 +15,7 @@ import (
 
 var errNoResponse = errors.New("fakerpc: no response recorded for the request")
 
-// Server TODO(rjeczalik): document
-type Server struct {
-	// TODO(rjeczalik): synchronized setter?
-	Reply func(src, dst *net.TCPAddr, bodyLen int64, err error)
-	m     sync.Mutex
-	conn  Connections
-	l     net.Listener
-	src   *net.TCPAddr
-	addr  string
-	isrun uint32
-	count int
-	wg    sync.WaitGroup
-}
+var noopReply = func(*net.TCPAddr, *net.TCPAddr, int64, error) {}
 
 func tcpaddrnil(addr net.Addr) (tcpa *net.TCPAddr) {
 	if a, err := tcpaddr(addr); err == nil {
@@ -41,6 +29,28 @@ func write500(rw net.Conn, err error) {
 	io.WriteString(rw, fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n"+
 		"Content-Length: %d\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n%s",
 		len(s), s))
+}
+
+// Server TODO(rjeczalik): document
+type Server struct {
+	Reply func(src, dst *net.TCPAddr, bodyLen int64, err error)
+	m     sync.Mutex
+	wg    sync.WaitGroup
+	wgr   sync.WaitGroup
+	conn  Connections
+	l     net.Listener
+	src   *net.TCPAddr
+	addr  string
+	isrun uint32
+	count int
+}
+
+// NewServer TODO(rjeczalik): document
+func NewServer(addr string, log *Log) (srv *Server, err error) {
+	srv = &Server{Reply: noopReply, addr: addr}
+	srv.wgr.Add(1)
+	srv.conn, err = NewConnections(log)
+	return
 }
 
 // ServeConn TODO(rjeczalik): document
@@ -80,15 +90,6 @@ func (srv *Server) ServeConn(rw net.Conn, c []Connection) {
 	srv.wg.Done()
 }
 
-var noopReply = func(*net.TCPAddr, *net.TCPAddr, int64, error) {}
-
-// NewServer TODO(rjeczalik): document
-func NewServer(addr string, log *Log) (srv *Server, err error) {
-	srv = &Server{Reply: noopReply, addr: addr}
-	srv.conn, err = NewConnections(log)
-	return
-}
-
 // ListenAndServe TODO(rjeczalik): document
 func (srv *Server) ListenAndServe() (err error) {
 	if atomic.CompareAndSwapUint32(&srv.isrun, 0, 1) {
@@ -108,6 +109,7 @@ func (srv *Server) ListenAndServe() (err error) {
 			srv.m.Unlock()
 			return
 		}
+		srv.wgr.Done()
 		srv.m.Unlock()
 		var (
 			c    []Connection
@@ -132,9 +134,19 @@ func (srv *Server) ListenAndServe() (err error) {
 	return ErrAlreadyRunning
 }
 
-// Running TODO(rjeczalik): document
-func (srv *Server) Running() bool {
-	return atomic.LoadUint32(&srv.isrun) == 1
+// Wait TODO(rjeczalik): document
+func (srv *Server) Wait() {
+	srv.wgr.Wait()
+}
+
+// Addr TODO(rjeczalik): document
+func (srv *Server) Addr() (addr net.Addr) {
+	if atomic.LoadUint32(&srv.isrun) == 1 {
+		srv.m.Lock()
+		addr = srv.l.Addr()
+		srv.m.Unlock()
+	}
+	return
 }
 
 // Stop TODO(rjeczalik): document
@@ -143,16 +155,7 @@ func (srv *Server) Stop() (err error) {
 	if atomic.CompareAndSwapUint32(&srv.isrun, 1, 0) {
 		srv.m.Lock()
 		err = srv.l.Close()
-		srv.m.Unlock()
-	}
-	return
-}
-
-// Addr TODO(rjeczalik): document
-func (srv *Server) Addr() (addr net.Addr) {
-	if srv.Running() {
-		srv.m.Lock()
-		addr = srv.l.Addr()
+		srv.wgr.Add(1)
 		srv.m.Unlock()
 	}
 	return

@@ -172,10 +172,11 @@ func (rl *recListener) Addr() net.Addr {
 type Proxy struct {
 	Record func(*Transmission)
 	m      sync.Mutex
-	rl     *recListener
+	wgr    sync.WaitGroup
 	targ   *url.URL
-	addr   string
+	rl     *recListener
 	srv    *http.Server
+	addr   string
 	isrun  uint32
 }
 
@@ -190,13 +191,13 @@ func NewProxy(addr, target string) (*Proxy, error) {
 		addr: addr,
 		srv:  &http.Server{Handler: httputil.NewSingleHostReverseProxy(u)},
 	}
+	p.wgr.Add(1)
 	return p, nil
 }
 
 // ListenAndServe TODO(rjeczalik): document
 func (p *Proxy) ListenAndServe() (err error) {
 	if atomic.CompareAndSwapUint32(&p.isrun, 0, 1) {
-		p.m.Lock()
 		defer func() {
 			// Ignore "use of closed network connection" comming from closed
 			// net.Listener when p was explicitely stopped.
@@ -204,6 +205,7 @@ func (p *Proxy) ListenAndServe() (err error) {
 				err = nil
 			}
 		}()
+		p.m.Lock()
 		var l net.Listener
 		if l, err = net.Listen("tcp", p.addr); err != nil {
 			p.m.Unlock()
@@ -213,6 +215,7 @@ func (p *Proxy) ListenAndServe() (err error) {
 			p.m.Unlock()
 			return
 		}
+		p.wgr.Done()
 		p.m.Unlock()
 		err = p.srv.Serve(p.rl)
 		return
@@ -221,13 +224,13 @@ func (p *Proxy) ListenAndServe() (err error) {
 }
 
 // Running TODO(rjeczalik): document
-func (p *Proxy) Running() bool {
-	return atomic.LoadUint32(&p.isrun) == 1
+func (p *Proxy) Wait() {
+	p.wgr.Wait()
 }
 
 // Addr TODO(rjeczalik): document
 func (p *Proxy) Addr() (addr net.Addr) {
-	if p.Running() {
+	if atomic.LoadUint32(&p.isrun) == 1 {
 		p.m.Lock()
 		addr = p.rl.Addr()
 		p.m.Unlock()
@@ -242,6 +245,7 @@ func (p *Proxy) Stop() (l *Log, err error) {
 		p.m.Lock()
 		l, err = &p.rl.log, p.rl.Close()
 		p.rl = nil
+		p.wgr.Add(1)
 		p.m.Unlock()
 		return
 	}
