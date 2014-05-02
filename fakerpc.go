@@ -3,6 +3,7 @@ package fakerpc
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"encoding/gob"
 	"errors"
 	"fmt"
@@ -60,31 +61,38 @@ func NewLog() *Log {
 }
 
 // ReadLog TODO(rjeczalik): document
-func ReadLog(file string) (l *Log, err error) {
+func ReadLog(file string) (*Log, error) {
 	f, err := os.Open(file)
 	if err != nil {
-		return
+		return nil, err
 	}
 	defer f.Close()
-	var buf bytes.Buffer
-	l = NewLog()
-	r := io.TeeReader(f, &buf)
-	dec := gob.NewDecoder(r)
-	if err = dec.Decode(l); err == nil {
-		return
+	l := NewLog()
+	r, err := gzip.NewReader(f)
+	if err != nil {
+		return l, NgrepUnmarshal(f, l)
 	}
-	err = NgrepUnmarshal(bytes.NewBuffer(buf.Bytes()), l)
-	return
+	defer r.Close()
+	var buf bytes.Buffer
+	if err = gob.NewDecoder(io.TeeReader(r, &buf)).Decode(l); err == nil {
+		return l, nil
+	}
+	return l, NgrepUnmarshal(bytes.NewBuffer(buf.Bytes()), l)
 }
 
 // WriteLog TODO(rjeczalik): document
-func WriteLog(file string, log *Log) error {
+func WriteLog(file string, l *Log) error {
 	f, err := os.OpenFile(file, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	return gob.NewEncoder(f).Encode(log)
+	w, err := gzip.NewWriterLevel(f, gzip.BestCompression)
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+	return gob.NewEncoder(w).Encode(l)
 }
 
 // Connection TODO(rjeczalik): document

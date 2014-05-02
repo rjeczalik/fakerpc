@@ -19,7 +19,7 @@ func Fixture(t *testing.T) (addr string, teardown func()) {
 		if f := runtime.FuncForPC(pc); f != nil {
 			if m := re.FindStringSubmatch(f.Name()); len(m) == 2 {
 				file, _ := f.FileLine(pc)
-				logfile = filepath.Join(filepath.Dir(file), "testdata", strings.ToLower(m[1])+".gob")
+				logfile = filepath.Join(filepath.Dir(file), "testdata", strings.ToLower(m[1])+".gzob")
 			}
 		}
 	}
