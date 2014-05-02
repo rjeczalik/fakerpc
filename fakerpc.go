@@ -34,7 +34,7 @@ type Log struct {
 
 // NetIP TODO(rjeczalik): document
 func (l *Log) NetIP() net.IP {
-	return ipnull(l.Network.IP)
+	return ipnil(l.Network.IP)
 }
 
 // NetMask TODO(rjeczalik): document
@@ -84,8 +84,7 @@ func WriteLog(file string, log *Log) error {
 		return err
 	}
 	defer f.Close()
-	enc := gob.NewEncoder(f)
-	return enc.Encode(log)
+	return gob.NewEncoder(f).Encode(log)
 }
 
 // Connection TODO(rjeczalik): document
@@ -104,6 +103,9 @@ func equal(lhs, rhs *net.TCPAddr) bool {
 
 // NewConnections TODO(rjeczalik): document
 func NewConnections(log *Log) (Connections, error) {
+	if log == nil || len(log.T) == 0 {
+		return nil, errors.New("fakerpc: log is either nil or empty")
+	}
 	c, index := make(Connections, 0), make(map[string]int)
 	for i := 0; i < len(log.T); {
 		addr := log.T[i].Src.String()
@@ -113,12 +115,19 @@ func NewConnections(log *Log) (Connections, error) {
 			n = len(c) - 1
 			index[addr] = n
 		}
-		header, body := SplitHTTP(log.T[i].Raw)
+		header, body := SplitHeaderBody(log.T[i].Raw)
 		req, err := http.ReadRequest(bufio.NewReader(bytes.NewBuffer(header)))
 		if err != nil {
 			return nil, err
 		}
 		var conn = Connection{Req: req}
+		if req.ContentLength == 0 {
+			req.ContentLength = int64(len(body))
+		}
+		if int64(len(body)) < req.ContentLength {
+			return nil, errors.New("fakerpc: recorded body length is too small")
+		}
+		body = body[:req.ContentLength]
 		if len(body) > 0 {
 			conn.ReqBody = make([]byte, len(body))
 			copy(conn.ReqBody, body)
@@ -134,8 +143,8 @@ func NewConnections(log *Log) (Connections, error) {
 	return c, nil
 }
 
-// SplitHTTP TODO(rjeczalik): document
-func SplitHTTP(p []byte) (header []byte, body []byte) {
+// SplitHeaderBody TODO(rjeczalik): document
+func SplitHeaderBody(p []byte) (header []byte, body []byte) {
 	if n := bytes.Index(p, []byte("\r\n\r\n")); n != -1 {
 		header = p[:n+4]
 		body = p[n+4:]

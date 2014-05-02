@@ -42,7 +42,8 @@ KK
 
 T 192.168.14.108:46795 -> 192.168.16.50:80 [AP]
 I.
-LIED`)
+LIED
+`)
 
 var lexp = &Log{
 	Network: net.IPNet{
@@ -139,7 +140,7 @@ var lexp = &Log{
 			IP:   net.IPv4(192, 168, 16, 50),
 			Port: 80,
 		},
-		Raw: []byte("I\r\nLIED"),
+		Raw: []byte("I\r\nLIED\n"),
 	}},
 }
 

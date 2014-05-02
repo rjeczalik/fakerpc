@@ -15,11 +15,6 @@ func init() {
 
 func httpsrv(t *testing.T) string {
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-		// TODO(rjeczalik): http: invalid Read on closed Body
-		// if _, err := io.Copy(w, req.Body); err != nil {
-		//   t.Error(err)
-		//   return
-		// }
 		var buf bytes.Buffer
 		if _, err := io.Copy(&buf, req.Body); err != nil {
 			t.Error(err)
@@ -54,7 +49,7 @@ func TestProxy(t *testing.T) {
 	addr := httpsrv(t)
 	p, err := NewProxy(":0", "http://"+addr)
 	if err != nil {
-		t.Fatalf("expected err=nil; got err=%q", err)
+		t.Fatalf("expected err=nil; got %q", err)
 	}
 	go func() {
 		if err := p.ListenAndServe(); err != nil {
@@ -87,80 +82,80 @@ func TestProxy(t *testing.T) {
 		for i, body := range body {
 			r, err := http.NewRequest("POST", "http://"+p.Addr().String(), bytes.NewBuffer(body))
 			if err != nil {
-				t.Errorf("expected err=nil; got err=%q (i=%d)", err, i)
+				t.Errorf("expected err=nil; got %q (i=%d)", err, i)
 				continue
 			}
 			r.Close = (i == last)
 			res, err := c.Do(r)
 			if err != nil {
-				t.Errorf("expected err=nil; got err=%q (i=%d)", err, i)
+				t.Errorf("expected err=nil; got %q (i=%d)", err, i)
 				continue
 			}
 			buf := bytes.NewBuffer(make([]byte, 0, len(body)))
 			if _, err = io.Copy(buf, res.Body); err != nil {
-				t.Errorf("expected err=nil; got err=%q (i=%d)", err, i)
+				t.Errorf("expected err=nil; got %q (i=%d)", err, i)
 				continue
 			}
 			if buf.Len() != len(body) {
-				t.Errorf("expected buf.Len()=%d; got buf.Len()=%d", len(body), buf.Len())
+				t.Errorf("expected buf.Len()=%d; got %d", len(body), buf.Len())
 				continue
 			}
 			if !bytes.Equal(buf.Bytes(), body) {
-				t.Errorf("expected res.Body=%q; got res.Body=%q", buf.Bytes(), body)
+				t.Errorf("expected res.Body=%q; got %q", buf.Bytes(), body)
 			}
 		}
 	}
 	log, err := p.Stop()
 	if err != nil {
-		t.Fatalf("expected err=nil; got err=%q", err)
+		t.Fatalf("expected err=nil; got %q", err)
 	}
 	if len(log.T) != len(all)*2 {
-		t.Errorf("expected len(log.T)=%d; got len(log.T)=%d", len(all)*2, len(log.T))
+		t.Errorf("expected len(log.T)=%d; got %d", len(all)*2, len(log.T))
 	}
 	for i := range all {
 		j := 2 * i
-		header, body := SplitHTTP(log.T[j].Raw)
+		header, body := SplitHeaderBody(log.T[j].Raw)
 		if header == nil {
-			t.Errorf("expected header != nil (log.T[%d].Raw)", j)
+			t.Errorf("expected header!=nil (log.T[%d].Raw)", j)
 			continue
 		}
 		if body == nil {
-			t.Errorf("expected body != nil (log.T[%d].Raw)", j)
+			t.Errorf("expected body!=nil (log.T[%d].Raw)", j)
 			continue
 		}
 		if len(body) != len(all[i]) {
-			t.Errorf("expected len(body)=%d; got len(body)=%d (log.T[%d].Raw)",
+			t.Errorf("expected len(body)=%d; got %d (log.T[%d].Raw)",
 				len(all[i]), len(body), j)
 			continue
 		}
 		if !bytes.Equal(body, all[i]) {
-			t.Errorf("expected body == all[%d] (log.T[%d].Raw)", i, j)
+			t.Errorf("expected body==all[%d] (log.T[%d].Raw)", i, j)
 		}
 	}
-	// TODO(rjeczalik): move to fakerpc_test.go
 	c, err := NewConnections(log)
 	if err != nil {
-		t.Fatalf("expected err=nil; got err=%q", err)
+		t.Fatalf("expected err=nil; got %q", err)
 	}
 	if len(c) != len(body) {
-		t.Fatalf("expected len(c)=%d; got len(c)=%d", len(body), len(c))
+		t.Fatalf("expected len(c)=%d; got %d", len(body), len(c))
 	}
 	for i, c := range c {
 		if len(c) != len(body[i]) {
-			t.Errorf("expected len(c)=%d; got len(c)=%d (i=%d)", len(body[i]), len(c), i)
+			t.Errorf("expected len(c[%d])=%d; got %d", i, len(body[i]), len(c))
 			continue
 		}
 		for j, c := range c {
 			if c.Req.Method != "POST" {
-				t.Errorf(`expected c.Req.Method="POST"; got %q`, c.Req.Method)
+				t.Errorf(`expected c[%d][%d].Req.Method="POST"; got %q`, i, j,
+					c.Req.Method)
 			}
 			if len(c.ReqBody) != len(body[i][j]) {
-				t.Errorf("expected len(c.ReqBody)=%d; got len(c.ReqBody)=%d (i=%d, j=%d)",
-					len(body[i][j]), len(c.ReqBody), i, j)
+				t.Errorf("expected len(c[%d][%d].ReqBody)=%d; got %d", i, j,
+					len(body[i][j]), len(c.ReqBody))
 			}
 			if len(c.Res) < len(body[i][j]) {
-				t.Errorf("expected len(c.Res)>%d; got len(c.Res)=%d (i=%d, j=%d)",
-					len(body[i][j]), len(c.Res), i, j)
+				t.Errorf("expected len(c[%d][%d].Res)>%d; got %d", i, j,
+					len(body[i][j]), len(c.Res))
 			}
 		}
 	}

@@ -37,7 +37,7 @@ func parseAddr(s string) (addr *net.TCPAddr, err error) {
 	return
 }
 
-func ipnull(ip net.IP) net.IP {
+func ipnil(ip net.IP) net.IP {
 	if ip == nil {
 		return net.IPv4(0, 0, 0, 0)
 	}
@@ -45,7 +45,7 @@ func ipnull(ip net.IP) net.IP {
 }
 
 func iptomask(ip net.IP) net.IPMask {
-	ip = ipnull(ip)
+	ip = ipnil(ip)
 	return net.IPv4Mask(ip[12], ip[13], ip[14], ip[15])
 }
 
@@ -53,7 +53,7 @@ func masktoip(mask net.IPMask) (ip net.IP) {
 	if mask != nil {
 		ip = net.IPv4(mask[0], mask[1], mask[2], mask[3])
 	}
-	return ipnull(ip)
+	return ipnil(ip)
 }
 
 // NgrepUnmarshal TODO(rjeczalik): document
@@ -154,6 +154,9 @@ func NgrepMarshal(w io.Writer, l *Log) (err error) {
 			}
 			if len(b) > 1 && b[len(b)-2] == '\r' {
 				b[len(b)-2] = '.'
+			}
+			if b[len(b)-1] != '\n' {
+				b = append(b, '\n')
 			}
 			if _, err = fmt.Fprintf(w, "%s", b); err != nil {
 				return
