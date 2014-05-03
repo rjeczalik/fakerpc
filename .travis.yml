@@ -3,6 +3,7 @@ go:
  - 1.2.1
  - tip
 install:
+ - go get code.google.com/p/go.tools/cmd/vet
  - go get -v ./...
 script:
  - go tool vet -all .
