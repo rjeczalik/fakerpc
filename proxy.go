@@ -1,11 +1,11 @@
 package fakerpc
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"strconv"
 	"sync"
 	"sync/atomic"
 )
@@ -50,58 +50,12 @@ func (rc *recConn) Write(p []byte) (n int, err error) {
 
 func (rc *recConn) Close() (err error) {
 	err = rc.Conn.Close()
-	// TODO(rjeczalik): tail might be still empty
 	if len(rc.t) > 0 && rc.t[len(rc.t)-1].Src == nil {
 		rc.t = rc.t[:len(rc.t)-1]
 	}
 	rc.commit(rc.t)
 	rc.wg.Done()
 	return
-}
-
-var addrcache = make(map[string]*net.TCPAddr)
-
-func tcpaddr(addr net.Addr) (*net.TCPAddr, error) {
-	tcpa, ok := addr.(*net.TCPAddr)
-	if ok {
-		return tcpa, nil
-	}
-	tcpa, ok = addrcache[addr.String()]
-	if ok {
-		return tcpa, nil
-	}
-	host, port, err := net.SplitHostPort(addr.String())
-	if err != nil {
-		return nil, err
-	}
-	tcpa = &net.TCPAddr{}
-	if tcpa.Port, err = strconv.Atoi(port); err != nil {
-		return nil, err
-	}
-	if tcpa.IP = net.ParseIP(host); tcpa.IP != nil {
-		addrcache[addr.String()] = tcpa
-		return tcpa, nil
-	}
-	ips, err := net.LookupIP(host)
-	if err != nil {
-		return nil, err
-	}
-	tcpa.IP = ips[0]
-	addrcache[addr.String()] = tcpa
-	return tcpa, nil
-}
-
-type hpwrap string
-
-func (w hpwrap) Network() string { return string(w) }
-func (w hpwrap) String() string  { return string(w) }
-
-func urltotcpaddr(u *url.URL) (*net.TCPAddr, error) {
-	hp := u.Host
-	if _, _, err := net.SplitHostPort(hp); err != nil {
-		hp = hp + ":80"
-	}
-	return tcpaddr(hpwrap(hp))
 }
 
 type recListener struct {
@@ -119,8 +73,16 @@ func newRecListener(lis net.Listener, u *url.URL, rec func(*Transmission)) (l *r
 	if err != nil {
 		return
 	}
+	ipnet, err := ipnetaddr(lis.Addr())
+	if err != nil {
+		return
+	}
 	l = &recListener{
-		log: Log{T: make([]Transmission, 0)},
+		log: Log{
+			Network: net.IPNet{IP: ipnet.IP, Mask: ipnet.Mask},
+			Filter:  fmt.Sprintf("(ip or ipv6) and ( host %s and port %d )", src.IP, src.Port),
+			T:       make([]Transmission, 0),
+		},
 		lis: lis,
 		src: src,
 		rec: rec,
@@ -158,6 +120,7 @@ func (rl *recListener) Accept() (c net.Conn, err error) {
 	return
 }
 
+// TODO(rjeczalik): Forcefully close open connections?
 func (rl *recListener) Close() (err error) {
 	err = rl.lis.Close()
 	rl.wg.Wait()
@@ -170,6 +133,7 @@ func (rl *recListener) Addr() net.Addr {
 
 // Proxy TODO(rjeczalik): document
 type Proxy struct {
+	// Record TODO(rjeczalik): document
 	Record func(*Transmission)
 	m      sync.Mutex
 	wgr    sync.WaitGroup
@@ -223,14 +187,10 @@ func (p *Proxy) ListenAndServe() (err error) {
 	return ErrAlreadyRunning
 }
 
-// Running TODO(rjeczalik): document
-func (p *Proxy) Wait() {
-	p.wgr.Wait()
-}
-
 // Addr TODO(rjeczalik): document
 func (p *Proxy) Addr() (addr net.Addr) {
 	if atomic.LoadUint32(&p.isrun) == 1 {
+		p.wgr.Wait()
 		p.m.Lock()
 		addr = p.rl.Addr()
 		p.m.Unlock()
@@ -242,6 +202,7 @@ func (p *Proxy) Addr() (addr net.Addr) {
 func (p *Proxy) Stop() (l *Log, err error) {
 	err = ErrNotRunning
 	if atomic.CompareAndSwapUint32(&p.isrun, 1, 0) {
+		p.wgr.Wait()
 		p.m.Lock()
 		l, err = &p.rl.log, p.rl.Close()
 		p.rl = nil

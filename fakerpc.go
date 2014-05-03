@@ -7,7 +7,6 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"os"
@@ -28,19 +27,17 @@ type Transmission struct {
 
 // Log TODO(rjeczalik): document
 type Log struct {
+	// Network TODO(rjeczalik): document
 	Network net.IPNet
-	Filter  string
-	T       []Transmission
+	// Filter TODO(rjeczalik): document
+	Filter string
+	// T TODO(rjeczalik): document
+	T []Transmission
 }
 
 // NetIP TODO(rjeczalik): document
-func (l *Log) NetIP() net.IP {
-	return ipnil(l.Network.IP)
-}
-
-// NetMask TODO(rjeczalik): document
-func (l *Log) NetMask() net.IP {
-	return masktoip(l.Network.Mask)
+func (l *Log) Net() string {
+	return fmt.Sprintf("%v/%v", ipnil(l.Network.IP), masktoip(l.Network.Mask))
 }
 
 // NetFilter TODO(rjeczalik): document
@@ -70,14 +67,15 @@ func ReadLog(file string) (*Log, error) {
 	l := NewLog()
 	r, err := gzip.NewReader(f)
 	if err != nil {
+		f.Seek(0, 0)
 		return l, NgrepUnmarshal(f, l)
 	}
 	defer r.Close()
-	var buf bytes.Buffer
-	if err = gob.NewDecoder(io.TeeReader(r, &buf)).Decode(l); err == nil {
-		return l, nil
+	if err = gob.NewDecoder(r).Decode(l); err != nil {
+		f.Seek(0, 0)
+		return l, NgrepUnmarshal(f, l)
 	}
-	return l, NgrepUnmarshal(bytes.NewBuffer(buf.Bytes()), l)
+	return l, nil
 }
 
 // WriteLog TODO(rjeczalik): document
@@ -104,10 +102,6 @@ type Connection struct {
 
 // Connections TODO(rjeczalik): document
 type Connections [][]Connection
-
-func equal(lhs, rhs *net.TCPAddr) bool {
-	return lhs == rhs || (lhs.IP.Equal(rhs.IP) && lhs.Port == rhs.Port)
-}
 
 // NewConnections TODO(rjeczalik): document
 func NewConnections(log *Log) (Connections, error) {
@@ -140,7 +134,7 @@ func NewConnections(log *Log) (Connections, error) {
 			conn.ReqBody = make([]byte, len(body))
 			copy(conn.ReqBody, body)
 		}
-		if i+1 < len(log.T) && equal(log.T[i].Src, log.T[i+1].Dst) {
+		if i+1 < len(log.T) && tcpaddrequal(log.T[i].Src, log.T[i+1].Dst) {
 			i += 1
 			conn.Res = make([]byte, len(log.T[i].Raw))
 			copy(conn.Res, log.T[i].Raw)

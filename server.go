@@ -17,13 +17,6 @@ var errNoResponse = errors.New("fakerpc: no response recorded for the request")
 
 var noopReply = func(*net.TCPAddr, *net.TCPAddr, int64, error) {}
 
-func tcpaddrnil(addr net.Addr) (tcpa *net.TCPAddr) {
-	if a, err := tcpaddr(addr); err == nil {
-		tcpa = a
-	}
-	return
-}
-
 func write500(rw net.Conn, err error) {
 	s := err.Error()
 	io.WriteString(rw, fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n"+
@@ -83,7 +76,7 @@ func (srv *Server) ServeConn(rw net.Conn, c []Connection) {
 			srv.Reply(srv.src, rem, int64(len(c[i].Res)), err)
 		}
 	}
-	if err != io.EOF {
+	if err != nil && err != io.EOF {
 		srv.Reply(rem, srv.src, 0, err)
 	}
 	rw.Close()
@@ -134,14 +127,10 @@ func (srv *Server) ListenAndServe() (err error) {
 	return ErrAlreadyRunning
 }
 
-// Wait TODO(rjeczalik): document
-func (srv *Server) Wait() {
-	srv.wgr.Wait()
-}
-
 // Addr TODO(rjeczalik): document
 func (srv *Server) Addr() (addr net.Addr) {
 	if atomic.LoadUint32(&srv.isrun) == 1 {
+		srv.wgr.Wait()
 		srv.m.Lock()
 		addr = srv.l.Addr()
 		srv.m.Unlock()
@@ -153,6 +142,7 @@ func (srv *Server) Addr() (addr net.Addr) {
 func (srv *Server) Stop() (err error) {
 	err = ErrNotRunning
 	if atomic.CompareAndSwapUint32(&srv.isrun, 1, 0) {
+		srv.wgr.Wait()
 		srv.m.Lock()
 		err = srv.l.Close()
 		srv.wgr.Add(1)

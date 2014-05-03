@@ -37,25 +37,6 @@ func parseAddr(s string) (addr *net.TCPAddr, err error) {
 	return
 }
 
-func ipnil(ip net.IP) net.IP {
-	if ip == nil {
-		return net.IPv4(0, 0, 0, 0)
-	}
-	return ip
-}
-
-func iptomask(ip net.IP) net.IPMask {
-	ip = ipnil(ip)
-	return net.IPv4Mask(ip[12], ip[13], ip[14], ip[15])
-}
-
-func masktoip(mask net.IPMask) (ip net.IP) {
-	if mask != nil {
-		ip = net.IPv4(mask[0], mask[1], mask[2], mask[3])
-	}
-	return ipnil(ip)
-}
-
 // NgrepUnmarshal TODO(rjeczalik): document
 func NgrepUnmarshal(r io.Reader, l *Log) error {
 	type state uint8
@@ -125,7 +106,7 @@ func NgrepUnmarshal(r io.Reader, l *Log) error {
 
 // NgrepMarshal TODO(rjeczalik): document
 func NgrepMarshal(w io.Writer, l *Log) (err error) {
-	_, err = fmt.Fprintf(w, "interface: dunno0 (%s/%s)\n", l.NetIP(), l.NetMask())
+	_, err = fmt.Fprintf(w, "interface: dunno0 (%s)\n", l.Net())
 	if err != nil {
 		return
 	}

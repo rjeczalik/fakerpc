@@ -32,7 +32,7 @@ func logfile() (path string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	base := filepath.Join(u.HomeDir, "fakerpc.log")
+	base := filepath.Join(u.HomeDir, "fakerpc.gzob")
 	for i := 0; i < 1024; i++ {
 		path = fmt.Sprintf("%s.%d", base, i)
 		if _, err = os.Stat(path); os.IsNotExist(err) {
@@ -61,20 +61,20 @@ func NewCLI() *CLI {
 	cl.app.Version = "0.1.0"
 	cl.app.Usage = "use gentle and with great care"
 	cl.app.Flags = []cli.Flag{
-		cli.StringFlag{Name: "addr", Value: ":0", Usage: "An address to listen on"},
-		cli.StringFlag{Name: "log", Value: logfile(), Usage: "A path to the log file (or ngrep output)"},
+		cli.StringFlag{Name: "addr", Value: "localhost:0", Usage: "An address to listen on"},
+		cli.StringFlag{Name: "log", Value: logfile(), Usage: "A path to the record-log file (or ngrep output)"},
 	}
 	cl.app.Commands = []cli.Command{{
 		Name:   "record",
-		Usage:  "Record all transmission going through proxy",
+		Usage:  "Proxies connections recording them all to the record-log",
 		Action: cl.Record,
 	}, {
 		Name:   "reply",
-		Usage:  "Reply recorded transmissions",
+		Usage:  "Serves connections with recorded responses from the record-log",
 		Action: cl.Reply,
 	}, {
 		Name:   "show",
-		Usage:  "Show log as ngrep output",
+		Usage:  "Shows record-log as a ngrep output",
 		Action: cl.Show,
 	}}
 	return cl
@@ -104,7 +104,6 @@ func (cl *CLI) Record(ctx *cli.Context) {
 		close(done)
 	}()
 	signal.Notify(sig, os.Interrupt, os.Kill)
-	p.Wait()
 	cl.Out(fmt.Sprintf("fakerpc: Proxy recording on %s . . .", p.Addr()))
 	<-sig
 	cl.Out("fakerpc: Signal caught; stopping proxy . . .")
@@ -149,7 +148,6 @@ func (cl *CLI) Reply(ctx *cli.Context) {
 		}
 		close(done)
 	}()
-	srv.Wait()
 	cl.Out(fmt.Sprintf("fakerpc: Server replying on %s . . .", srv.Addr()))
 	<-done
 }

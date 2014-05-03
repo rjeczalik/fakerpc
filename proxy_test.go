@@ -25,7 +25,7 @@ func httpsrv(t *testing.T) string {
 			t.Error(err)
 		}
 	})
-	l, err := net.Listen("tcp", ":0")
+	l, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func mul(p []byte, n int) []byte {
 
 func TestProxy(t *testing.T) {
 	addr := httpsrv(t)
-	p, err := NewProxy(":0", "http://"+addr)
+	p, err := NewProxy("localhost:0", "http://"+addr)
 	if err != nil {
 		t.Fatalf("expected err=nil; got %q", err)
 	}
