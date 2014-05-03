@@ -1,0 +1,9 @@
+language: go
+go:
+ - 1.2.1
+ - tip
+install:
+ - go get -v ./...
+script:
+ - go tool vet -all .
+ - go test -race -v ./...
