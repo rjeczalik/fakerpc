@@ -10,6 +10,8 @@ import (
 	"sync/atomic"
 )
 
+var noopRecord = func(*Transmission) {}
+
 type recConn struct {
 	net.Conn
 	t      []Transmission
@@ -22,9 +24,7 @@ type recConn struct {
 
 func (rc *recConn) record(p []byte, src, dst *net.TCPAddr) {
 	if rc.t[len(rc.t)-1].Src != src {
-		if rc.rec != nil {
-			rc.rec(&rc.t[len(rc.t)-1])
-		}
+		rc.rec(&rc.t[len(rc.t)-1])
 		rc.t = append(rc.t, Transmission{})
 	}
 	if len(p) != 0 {
@@ -131,9 +131,10 @@ func (rl *recListener) Addr() net.Addr {
 	return rl.lis.Addr()
 }
 
-// Proxy TODO(rjeczalik): document
+// A Proxy represents a single host HTTP reverse proxy which records all the
+// transmission it handles.
 type Proxy struct {
-	// Record TODO(rjeczalik): document
+	// Record function is called after each transmission is successfully completed.
 	Record func(*Transmission)
 	m      sync.Mutex
 	wgr    sync.WaitGroup
@@ -144,22 +145,25 @@ type Proxy struct {
 	isrun  uint32
 }
 
-// NewProxy TODO(rjeczalik): document
+// NewProxy gives new Proxy for the given target URL and listening on the given
+// TCP network address.
 func NewProxy(addr, target string) (*Proxy, error) {
 	u, err := url.Parse(target)
 	if err != nil {
 		return nil, err
 	}
 	p := &Proxy{
-		targ: u,
-		addr: addr,
-		srv:  &http.Server{Handler: httputil.NewSingleHostReverseProxy(u)},
+		Record: noopRecord,
+		targ:   u,
+		addr:   addr,
+		srv:    &http.Server{Handler: httputil.NewSingleHostReverseProxy(u)},
 	}
 	p.wgr.Add(1)
 	return p, nil
 }
 
-// ListenAndServe TODO(rjeczalik): document
+// ListenAndServe starts listening for connections, recording them and proxying
+// to the target URL.
 func (p *Proxy) ListenAndServe() (err error) {
 	if atomic.CompareAndSwapUint32(&p.isrun, 0, 1) {
 		defer func() {
@@ -187,7 +191,8 @@ func (p *Proxy) ListenAndServe() (err error) {
 	return ErrAlreadyRunning
 }
 
-// Addr TODO(rjeczalik): document
+// Addr returns the Proxy's network address. It gives nil when the Proxy
+// is not running.
 func (p *Proxy) Addr() (addr net.Addr) {
 	if atomic.LoadUint32(&p.isrun) == 1 {
 		p.wgr.Wait()
@@ -198,7 +203,8 @@ func (p *Proxy) Addr() (addr net.Addr) {
 	return
 }
 
-// Stop TODO(rjeczalik): document
+// Stop stops the Proxy from accepting new connections. It waits for on-going
+// connections to finish, ensuring all of them were captured in the l.
 func (p *Proxy) Stop() (l *Log, err error) {
 	err = ErrNotRunning
 	if atomic.CompareAndSwapUint32(&p.isrun, 1, 0) {

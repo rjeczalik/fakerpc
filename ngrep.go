@@ -37,7 +37,8 @@ func parseAddr(s string) (addr *net.TCPAddr, err error) {
 	return
 }
 
-// NgrepUnmarshal TODO(rjeczalik): document
+// NgrepUnmarshal parses the ngrep output read from r and stores the result
+// in the l.
 func NgrepUnmarshal(r io.Reader, l *Log) error {
 	type state uint8
 	const (
@@ -104,13 +105,13 @@ func NgrepUnmarshal(r io.Reader, l *Log) error {
 	}
 }
 
-// NgrepMarshal TODO(rjeczalik): document
+// NgrepMarshal writes to w the l encoded as a ngrep output.
 func NgrepMarshal(w io.Writer, l *Log) (err error) {
 	_, err = fmt.Fprintf(w, "interface: dunno0 (%s)\n", l.Net())
 	if err != nil {
 		return
 	}
-	if _, err = fmt.Fprintf(w, "filter: %s\n", l.NetFilter()); err != nil {
+	if _, err = fmt.Fprintf(w, "filter: %s\n", l.Filter); err != nil {
 		return
 	}
 	for i := range l.T {

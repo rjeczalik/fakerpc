@@ -24,8 +24,10 @@ func write500(rw net.Conn, err error) {
 		len(s), s))
 }
 
-// Server TODO(rjeczalik): document
+// A Server represents a HTTP server, which serves connections by replying with
+// recorded responses.
 type Server struct {
+	// Reply function is called after each transmission is successfully completed.
 	Reply func(src, dst *net.TCPAddr, bodyLen int64, err error)
 	m     sync.Mutex
 	wg    sync.WaitGroup
@@ -38,7 +40,7 @@ type Server struct {
 	count int
 }
 
-// NewServer TODO(rjeczalik): document
+// NewServer gives new Server for the given address and log.
 func NewServer(addr string, log *Log) (srv *Server, err error) {
 	srv = &Server{Reply: noopReply, addr: addr}
 	srv.wgr.Add(1)
@@ -46,7 +48,7 @@ func NewServer(addr string, log *Log) (srv *Server, err error) {
 	return
 }
 
-// ServeConn TODO(rjeczalik): document
+// ServeConn copies a response from c for every of the rw coonection's request.
 func (srv *Server) ServeConn(rw net.Conn, c []Connection) {
 	var (
 		n   int64
@@ -83,7 +85,9 @@ func (srv *Server) ServeConn(rw net.Conn, c []Connection) {
 	srv.wg.Done()
 }
 
-// ListenAndServe TODO(rjeczalik): document
+// ListenAndServe starts the server which handles only specific number of
+// connections, determined by the Log argument given during creation of
+// the server; after those connections were served, Server stops itself.
 func (srv *Server) ListenAndServe() (err error) {
 	if atomic.CompareAndSwapUint32(&srv.isrun, 0, 1) {
 		srv.m.Lock()
@@ -127,7 +131,8 @@ func (srv *Server) ListenAndServe() (err error) {
 	return ErrAlreadyRunning
 }
 
-// Addr TODO(rjeczalik): document
+// Addr returns the Server's network address. It gives nil when the Server
+// is not running.
 func (srv *Server) Addr() (addr net.Addr) {
 	if atomic.LoadUint32(&srv.isrun) == 1 {
 		srv.wgr.Wait()
@@ -138,7 +143,8 @@ func (srv *Server) Addr() (addr net.Addr) {
 	return
 }
 
-// Stop TODO(rjeczalik): document
+// Stop stops the Server from accepting new connections. It waits for on-going
+// connections to finish.
 func (srv *Server) Stop() (err error) {
 	err = ErrNotRunning
 	if atomic.CompareAndSwapUint32(&srv.isrun, 1, 0) {

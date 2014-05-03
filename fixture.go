@@ -11,6 +11,38 @@ import (
 
 var re = regexp.MustCompile(`.*\.(Test.*)`)
 
+// Fixture provides a fake server for mocking HTTP-based RPC services. A single
+// fixture has TestXxx-function scope, which makes it sutiable for parallel test
+// execution. Typical usage of the Fixture function is to setup the mock at the
+// begining of the test, deferring returned "teardown" func; the "addr" return
+// value is new network address of the RPC service being tested. Example:
+//
+//   func TestName(t *testing.T) {
+//     addr, teardown := fakerpc.Fixture(t)
+//     defer teardown()
+//     // ...
+//     client, err := rpc.DialHTTP("tcp", addr)
+//     // ...
+//
+// Control
+//
+// The default behavior of the fake is to reply to requests issued within a test
+// with previously-recorded responses. The fake looks up the record-log file
+// under the ./testdata/{{.testname}}.gzob which is relative to the *_test.go file
+// from which the Fixture was called. The ".testname" is a lower-cased TestXxx-
+// function name.
+//
+// A mock server created by the Fixture can be configured to act as:
+//
+//  * a reply-server (default behavior)
+//  * a proxy service by setting the target URL with FAKERPC environment variable
+//  * a recording proxy service - accordingly FAKERPC_RECORD environment variable
+//
+// In order to create record-log files for the first use of a reply-server, run
+// the tests with a FAKERPC_RECORD environment variable pointing to your service's
+// end point. Example:
+//
+//   FAKERPC_RECORD="http://rpc.int.mycompany.com:8079" go test ./...
 func Fixture(t *testing.T) (addr string, teardown func()) {
 	pc := make([]uintptr, 10)
 	runtime.Callers(1, pc)

@@ -12,52 +12,51 @@ import (
 	"os"
 )
 
-// ErrAlreadyRunning TODO(rjeczalik): document
+// ErrAlreadyRunning is returned when calling ListenAndServe on a server which
+// was already started by ListenAndServe.
 var ErrAlreadyRunning = errors.New("fakerpc: server is already running")
 
-// ErrNotRunning TODO(rjeczalik): document
+// ErrNotRunning is returned when calling Stop on a server which wasn't started
+// by ListenAndServe or was already stopped by Stop.
 var ErrNotRunning = errors.New("fakerpc: server is not running")
 
-// Transmission TODO(rjeczalik): document
+// A Transmission represents a single raw data transmission between two TCP
+// end points.
 type Transmission struct {
+	// Src is a TCP address of the source.
 	Src *net.TCPAddr
+	// Dst is a TCP address of the destination.
 	Dst *net.TCPAddr
+	// Raw contains all the recorded bytes sent from Src to Dst until Dst began
+	// replying back to Src.
 	Raw []byte
 }
 
-// Log TODO(rjeczalik): document
+// A Log represents communication session, either captured by a Proxy or parsed
+// from a ngrep output.
 type Log struct {
-	// Network TODO(rjeczalik): document
+	// Network is an address of the netwrok, in which communication took place.
 	Network net.IPNet
-	// Filter TODO(rjeczalik): document
+	// Filter is an effective pcap filter applied to the recording session.
 	Filter string
-	// T TODO(rjeczalik): document
+	// T holds captured transmissions.
 	T []Transmission
 }
 
-// NetIP TODO(rjeczalik): document
+// Net returns the network name with the mask printed in a IP form instead of
+// hexadecimal one.
 func (l *Log) Net() string {
 	return fmt.Sprintf("%v/%v", ipnil(l.Network.IP), masktoip(l.Network.Mask))
 }
 
-// NetFilter TODO(rjeczalik): document
-func (l *Log) NetFilter() string {
-	if l.Filter != "" {
-		return l.Filter
-	}
-	if len(l.T) == 0 {
-		return "(none)"
-	}
-	return fmt.Sprintf("(ip or ipv6) and ( host %s and port %d )",
-		l.T[0].Dst.IP, l.T[0].Dst.Port)
-}
-
-// NewLog TODO(rjeczalik): document
+// NewLog gives a new Log.
 func NewLog() *Log {
 	return &Log{T: make([]Transmission, 0)}
 }
 
-// ReadLog TODO(rjeczalik): document
+// ReadLog gives Log decoded from the given file. It assumes the file contains
+// gzipped, gob-encoded Log struct. If it does not, it treats the file as a ngrep
+// output.
 func ReadLog(file string) (*Log, error) {
 	f, err := os.Open(file)
 	if err != nil {
@@ -78,7 +77,7 @@ func ReadLog(file string) (*Log, error) {
 	return l, nil
 }
 
-// WriteLog TODO(rjeczalik): document
+// WriteLog writes gzipped, gob-encoded Log struct to the file.
 func WriteLog(file string, l *Log) error {
 	f, err := os.OpenFile(file, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
@@ -93,17 +92,17 @@ func WriteLog(file string, l *Log) error {
 	return gob.NewEncoder(w).Encode(l)
 }
 
-// Connection TODO(rjeczalik): document
+// A Connection represents a single request/reponse communication.
 type Connection struct {
-	Req     *http.Request
-	ReqBody []byte
-	Res     []byte
+	Req     *http.Request // a HTTP header of the request
+	ReqBody []byte        // a body of the request
+	Res     []byte        // raw response
 }
 
-// Connections TODO(rjeczalik): document
+// Connections represent Log's transmissions grouped per connection.
 type Connections [][]Connection
 
-// NewConnections TODO(rjeczalik): document
+// NewConnections gives a Connections for the given log.
 func NewConnections(log *Log) (Connections, error) {
 	if log == nil || len(log.T) == 0 {
 		return nil, errors.New("fakerpc: log is either nil or empty")
@@ -145,7 +144,7 @@ func NewConnections(log *Log) (Connections, error) {
 	return c, nil
 }
 
-// SplitHeaderBody TODO(rjeczalik): document
+// SplitHeaderBody splits raw HTTP request/response into header and body.
 func SplitHeaderBody(p []byte) (header []byte, body []byte) {
 	if n := bytes.Index(p, []byte("\r\n\r\n")); n != -1 {
 		header = p[:n+4]
