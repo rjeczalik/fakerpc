@@ -191,15 +191,12 @@ func (p *Proxy) ListenAndServe() (err error) {
 	return ErrAlreadyRunning
 }
 
-// Addr returns the Proxy's network address. It gives nil when the Proxy
-// is not running.
+// Addr returns the Proxy's network address. It blocks when the p is not running.
 func (p *Proxy) Addr() (addr net.Addr) {
-	if atomic.LoadUint32(&p.isrun) == 1 {
-		p.wgr.Wait()
-		p.m.Lock()
-		addr = p.rl.Addr()
-		p.m.Unlock()
-	}
+	p.wgr.Wait()
+	p.m.Lock()
+	addr = p.rl.Addr()
+	p.m.Unlock()
 	return
 }
 

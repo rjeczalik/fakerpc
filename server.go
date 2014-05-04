@@ -131,15 +131,12 @@ func (srv *Server) ListenAndServe() (err error) {
 	return ErrAlreadyRunning
 }
 
-// Addr returns the Server's network address. It gives nil when the Server
-// is not running.
+// Addr returns the Server's network address. It blocks if the srv is not running.
 func (srv *Server) Addr() (addr net.Addr) {
-	if atomic.LoadUint32(&srv.isrun) == 1 {
-		srv.wgr.Wait()
-		srv.m.Lock()
-		addr = srv.l.Addr()
-		srv.m.Unlock()
-	}
+	srv.wgr.Wait()
+	srv.m.Lock()
+	addr = srv.l.Addr()
+	srv.m.Unlock()
 	return
 }
 
