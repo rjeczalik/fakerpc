@@ -5,13 +5,8 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"runtime"
 	"testing"
 )
-
-func init() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-}
 
 func httpsrv(t *testing.T) string {
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
