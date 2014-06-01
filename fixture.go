@@ -17,7 +17,7 @@ var re = regexp.MustCompile(`.*\.(Test.*)`)
 // begining of the test, deferring returned "teardown" func; the "addr" return
 // value is new network address of the RPC service being tested. Example:
 //
-//   func TestName(t *testing.T) {
+//   func TestXxxx(t *testing.T) {
 //     addr, teardown := fakerpc.Fixture(t)
 //     defer teardown()
 //     // ...
@@ -28,8 +28,8 @@ var re = regexp.MustCompile(`.*\.(Test.*)`)
 //
 // The default behavior of the fake is to reply to requests issued within a test
 // with previously-recorded responses. The fake looks up the record-log file
-// under the ./testdata/{{.testname}}.gzob which is relative to the *_test.go file
-// from which the Fixture was called. The ".testname" is a lower-cased TestXxx-
+// under the ./testdata/{{.testxxxx}}.gzob which is relative to the *_test.go file
+// from which the Fixture was called. The ".testname" is a lower-cased TestXxxx-
 // function name.
 //
 // A mock server created by the Fixture can be configured to act as:
@@ -42,7 +42,7 @@ var re = regexp.MustCompile(`.*\.(Test.*)`)
 // the tests with a FAKERPC_RECORD environment variable pointing to your service's
 // end point. Example:
 //
-//   FAKERPC_RECORD="http://rpc.int.mycompany.com:8079" go test ./...
+//   $ FAKERPC_RECORD="http://rpc.int.mycompany.com:8079" go test ./...
 func Fixture(t *testing.T) (addr string, teardown func()) {
 	pc := make([]uintptr, 10)
 	runtime.Callers(1, pc)
