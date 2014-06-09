@@ -2,6 +2,7 @@ package fakerpc
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -20,6 +21,7 @@ type recConn struct {
 	src    *net.TCPAddr
 	dst    *net.TCPAddr
 	wg     *sync.WaitGroup
+	onc    sync.Once
 }
 
 func (rc *recConn) record(p []byte, src, dst *net.TCPAddr) {
@@ -49,23 +51,27 @@ func (rc *recConn) Write(p []byte) (n int, err error) {
 }
 
 func (rc *recConn) Close() (err error) {
-	err = rc.Conn.Close()
-	if len(rc.t) > 0 && rc.t[len(rc.t)-1].Src == nil {
-		rc.t = rc.t[:len(rc.t)-1]
-	}
-	rc.commit(rc.t)
-	rc.wg.Done()
+	rc.onc.Do(func() {
+		err = rc.Conn.Close()
+		if len(rc.t) > 0 && rc.t[len(rc.t)-1].Src == nil {
+			rc.t = rc.t[:len(rc.t)-1]
+		}
+		rc.commit(rc.t)
+		rc.wg.Done()
+	})
 	return
 }
 
 type recListener struct {
 	log Log
 	wg  sync.WaitGroup
-	m   sync.Mutex
+	m   sync.Mutex // protects log and con
 	lis net.Listener
 	src *net.TCPAddr
 	dst *net.TCPAddr
 	rec func(*Transmission)
+	con map[io.Closer]struct{}
+	onc sync.Once
 }
 
 func newRecListener(lis net.Listener, u *url.URL, rec func(*Transmission)) (l *recListener, err error) {
@@ -86,38 +92,44 @@ func newRecListener(lis net.Listener, u *url.URL, rec func(*Transmission)) (l *r
 		lis: lis,
 		src: src,
 		rec: rec,
+		con: make(map[io.Closer]struct{}),
 	}
 	return
 }
 
-func (rl *recListener) Accept() (c net.Conn, err error) {
-	if c, err = rl.lis.Accept(); err != nil {
-		return
+func (rl *recListener) Accept() (net.Conn, error) {
+	c, err := rl.lis.Accept()
+	if err != nil {
+		return nil, err
 	}
 	dst, err := tcpaddr(c.RemoteAddr())
 	if err != nil {
 		c.Close()
 		return nil, err
 	}
-	c = &recConn{
+	conn := &recConn{
 		Conn: c,
 		t: []Transmission{{
 			Src: dst,
 			Dst: rl.src,
 			Raw: make([]byte, 0),
 		}},
-		commit: func(t []Transmission) {
-			rl.m.Lock()
-			rl.log.T = append(rl.log.T, t...)
-			rl.m.Unlock()
-		},
 		src: rl.src,
 		dst: dst,
 		wg:  &rl.wg,
 		rec: rl.rec,
 	}
+	conn.commit = func(t []Transmission) {
+		rl.m.Lock()
+		rl.log.T = append(rl.log.T, t...)
+		delete(rl.con, conn)
+		rl.m.Unlock()
+	}
 	rl.wg.Add(1)
-	return
+	rl.m.Lock()
+	rl.con[conn] = struct{}{}
+	rl.m.Unlock()
+	return conn, nil
 }
 
 // A proxytransport preserves original Host header from client's request.
@@ -144,10 +156,14 @@ func newReverseProxy(u *url.URL) *httputil.ReverseProxy {
 	return p
 }
 
-// TODO(rjeczalik): Forcefully close open connections?
 func (rl *recListener) Close() (err error) {
-	err = rl.lis.Close()
-	rl.wg.Wait()
+	rl.onc.Do(func() {
+		err = rl.lis.Close()
+		for c := range rl.con {
+			c.Close()
+		}
+		rl.wg.Wait()
+	})
 	return
 }
 
