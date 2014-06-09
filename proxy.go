@@ -120,6 +120,30 @@ func (rl *recListener) Accept() (c net.Conn, err error) {
 	return
 }
 
+// A proxytransport preserves original Host header from client's request.
+type proxytransport struct {
+	tr   http.RoundTripper
+	host string
+}
+
+func (pt proxytransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Host = pt.host
+	return pt.tr.RoundTrip(req)
+}
+
+func newProxyTransport(u *url.URL) http.RoundTripper {
+	return proxytransport{
+		tr:   &http.Transport{},
+		host: u.Host,
+	}
+}
+
+func newReverseProxy(u *url.URL) *httputil.ReverseProxy {
+	p := httputil.NewSingleHostReverseProxy(u)
+	p.Transport = newProxyTransport(u)
+	return p
+}
+
 // TODO(rjeczalik): Forcefully close open connections?
 func (rl *recListener) Close() (err error) {
 	err = rl.lis.Close()
@@ -156,7 +180,7 @@ func NewProxy(addr, target string) (*Proxy, error) {
 		Record: noopRecord,
 		targ:   u,
 		addr:   addr,
-		srv:    &http.Server{Handler: httputil.NewSingleHostReverseProxy(u)},
+		srv:    &http.Server{Handler: newReverseProxy(u)},
 	}
 	p.wgr.Add(1)
 	return p, nil
