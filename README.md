@@ -10,7 +10,7 @@ A fake server for recording and mocking HTTP-based RPC services.
 
 *Documentation*
 
-[godoc.org/github.com/rjeczalik/fakerpc/cmd/fakerpc#Fixture](https://godoc.org/github.com/rjeczalik/fakerpc#Fixture)
+[godoc.org/github.com/rjeczalik/fakerpc#Fixture](https://godoc.org/github.com/rjeczalik/fakerpc#Fixture)
 
 ## cmd/fakerpc [![GoDoc](https://godoc.org/github.com/rjeczalik/fakerpc/cmd/fakerpc?status.png)](https://godoc.org/github.com/rjeczalik/fakerpc/cmd/fakerpc)
 
