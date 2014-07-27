@@ -1,4 +1,4 @@
-## fakerpc [![GoDoc](https://godoc.org/github.com/rjeczalik/fakerpc?status.png)](https://godoc.org/github.com/rjeczalik/fakerpc) [![Build Status](https://travis-ci.org/rjeczalik/fakerpc.png?branch=master)](https://travis-ci.org/rjeczalik/fakerpc)
+## fakerpc [![GoDoc](https://godoc.org/github.com/rjeczalik/fakerpc?status.png)](https://godoc.org/github.com/rjeczalik/fakerpc) [![Build Status](https://travis-ci.org/rjeczalik/fakerpc.png?branch=master)](https://travis-ci.org/rjeczalik/fakerpc)[![Build status](https://ci.appveyor.com/api/projects/status/6dyoge7bpoop27ub)](https://ci.appveyor.com/project/rjeczalik/fakerpc)
 
 A fake server for recording and mocking HTTP-based RPC services.
 
@@ -18,7 +18,6 @@ A fake server for recording and mocking HTTP-based RPC services.
 
 ```
 ~ $ go get -u github.com/rjeczalik/fakerpc/cmd/fakerpc
-~ $ go install github.com/rjeczalik/fakerpc/cmd/fakerpc
 ```
 
 *Documentation*
