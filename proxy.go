@@ -72,13 +72,32 @@ type recListener struct {
 	rec func(*Transmission)
 	con map[io.Closer]struct{}
 	onc sync.Once
+	tmp bool
 }
 
-func newRecListener(lis net.Listener, u *url.URL, rec func(*Transmission)) (l *recListener, err error) {
-	src, err := urltotcpaddr(u)
+// ListenAndRecord announces on the local network address laddr, recording all the communication.
+//
+// It calls provided callback after each successful transmission.
+func ListenAndRecord(network, laddr string, callback func(*Transmission)) (net.Listener, error) {
+	lis, err := net.Listen(network, laddr)
 	if err != nil {
-		return
+		return nil, err
 	}
+	src, err := tcpaddr(lis.Addr())
+	if err != nil {
+		lis.Close()
+		return nil, err
+	}
+	rl, err := newRecListener(lis, src, callback)
+	if err != nil {
+		lis.Close()
+		return nil, err
+	}
+	rl.tmp = true
+	return rl, nil
+}
+
+func newRecListener(lis net.Listener, src *net.TCPAddr, rec func(*Transmission)) (l *recListener, err error) {
 	ipnet, err := ipnetaddr(lis.Addr())
 	if err != nil {
 		return
@@ -119,11 +138,19 @@ func (rl *recListener) Accept() (net.Conn, error) {
 		wg:  &rl.wg,
 		rec: rl.rec,
 	}
-	conn.commit = func(t []Transmission) {
-		rl.m.Lock()
-		rl.log.T = append(rl.log.T, t...)
-		delete(rl.con, conn)
-		rl.m.Unlock()
+	if rl.tmp {
+		conn.commit = func([]Transmission) {
+			rl.m.Lock()
+			delete(rl.con, conn)
+			rl.m.Unlock()
+		}
+	} else {
+		conn.commit = func(t []Transmission) {
+			rl.m.Lock()
+			rl.log.T = append(rl.log.T, t...)
+			delete(rl.con, conn)
+			rl.m.Unlock()
+		}
 	}
 	rl.wg.Add(1)
 	rl.m.Lock()
@@ -156,13 +183,16 @@ func newReverseProxy(u *url.URL) *httputil.ReverseProxy {
 	return p
 }
 
+func (rl *recListener) Wait() {
+	rl.wg.Wait()
+}
+
 func (rl *recListener) Close() (err error) {
 	rl.onc.Do(func() {
 		err = rl.lis.Close()
 		for c := range rl.con {
 			c.Close()
 		}
-		rl.wg.Wait()
 	})
 	return
 }
@@ -219,7 +249,13 @@ func (p *Proxy) ListenAndServe() (err error) {
 			p.m.Unlock()
 			return
 		}
-		if p.rl, err = newRecListener(l, p.targ, p.Record); err != nil {
+		var src *net.TCPAddr
+		src, err = urltotcpaddr(p.targ)
+		if err != nil {
+			p.m.Unlock()
+			return
+		}
+		if p.rl, err = newRecListener(l, src, p.Record); err != nil {
 			p.m.Unlock()
 			return
 		}
