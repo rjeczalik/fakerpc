@@ -56,6 +56,7 @@ func (rc *recConn) Close() (err error) {
 		if len(rc.t) > 0 && rc.t[len(rc.t)-1].Src == nil {
 			rc.t = rc.t[:len(rc.t)-1]
 		}
+		rc.rec(&rc.t[len(rc.t)-1])
 		rc.commit(rc.t)
 		rc.wg.Done()
 	})
