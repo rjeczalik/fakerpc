@@ -84,6 +84,13 @@ func ListenAndRecord(network, laddr string, callback func(*Transmission)) (net.L
 	if err != nil {
 		return nil, err
 	}
+	return Record(lis, callback)
+}
+
+// Record records all network communication on the listener.
+//
+// On failure it closes the listener returning non-nil error.
+func Record(lis net.Listener, callback func(*Transmission)) (net.Listener, error) {
 	src, err := tcpaddr(lis.Addr())
 	if err != nil {
 		lis.Close()

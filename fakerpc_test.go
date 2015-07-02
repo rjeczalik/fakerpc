@@ -61,16 +61,16 @@ var expconn = [][]Connection{{{
 	Req:     &http.Request{Method: "POST", ContentLength: 3, URL: &url.URL{Path: "/1"}},
 	ReqBody: []byte("HAI"), Res: []byte("HTTP/1.1 200 OK\nContent-Length: 4\r\n\r\nHAAI"),
 }, {
-	Req:     &http.Request{Method: "POST", ContentLength: 4, URL: &url.URL{Path: "/2"}},
+	Req:     &http.Request{Method: "POST", ContentLength: 4, URL: &url.URL{Path: "/2"}, Close: true},
 	ReqBody: []byte("BAAI"), Res: []byte("HTTP/1.1 200 OK\nContent-Length: 5\r\n\r\nBAAAI"),
 }}, {{
-	Req:     &http.Request{Method: "POST", ContentLength: 3, URL: &url.URL{Path: "/3"}},
+	Req:     &http.Request{Method: "POST", ContentLength: 3, URL: &url.URL{Path: "/3"}, Close: true},
 	ReqBody: []byte("HAI"), Res: []byte("HTTP/1.1 200 OK\r\n\r\n"),
 }}, {{
 	Req:     &http.Request{Method: "POST", ContentLength: 4, URL: &url.URL{Path: "/4"}},
 	ReqBody: []byte("HAAI"), Res: []byte("HTTP/1.1 200 OK\nContent-Length: 5\r\n\r\nHAAAI"),
 }, {
-	Req:     &http.Request{Method: "POST", ContentLength: 6, URL: &url.URL{Path: "/5"}},
+	Req:     &http.Request{Method: "POST", ContentLength: 6, URL: &url.URL{Path: "/5"}, Close: true},
 	ReqBody: []byte("BAAAAI"), Res: []byte("HTTP/1.1 200 OK\nContent-Length: 7\r\n\r\nBAIBAAI"),
 }}}
 
