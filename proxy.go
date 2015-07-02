@@ -13,6 +13,10 @@ import (
 
 var noopRecord = func(*Transmission) {}
 
+type TCPConn interface {
+	TCPConn() *net.TCPConn
+}
+
 type recConn struct {
 	net.Conn
 	t      []Transmission
@@ -22,6 +26,10 @@ type recConn struct {
 	dst    *net.TCPAddr
 	wg     *sync.WaitGroup
 	onc    sync.Once
+}
+
+func (rc *recConn) TCPConn() *net.TCPConn {
+	return rc.Conn.(*net.TCPConn)
 }
 
 func (rc *recConn) record(p []byte, src, dst *net.TCPAddr) {
