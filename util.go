@@ -69,7 +69,7 @@ func tcpaddrequal(lhs, rhs *net.TCPAddr) bool {
 	return lhs == rhs || (lhs.IP.Equal(rhs.IP) && lhs.Port == rhs.Port)
 }
 
-func ipnetaddr(addr net.Addr) (*net.IPNet, error) {
+func ipnetaddr(addr net.Addr) ([]*net.IPNet, error) {
 	ip, err := tcpaddr(addr)
 	if err != nil {
 		return nil, err
@@ -78,18 +78,25 @@ func ipnetaddr(addr net.Addr) (*net.IPNet, error) {
 	if err != nil {
 		return nil, err
 	}
+	var all []*net.IPNet
 	for _, ifi := range ifi {
 		addr, err := ifi.Addrs()
 		if err != nil {
 			continue
 		}
 		for _, addr := range addr {
-			if ipnet, ok := addr.(*net.IPNet); ok && ipnet.Contains(ip.IP) {
-				return ipnet, nil
+			if ipnet, ok := addr.(*net.IPNet); ok {
+				if ipnet.Contains(ip.IP) {
+					return []*net.IPNet{ipnet}, nil
+				}
+				all = append(all, ipnet)
 			}
 		}
 	}
-	return nil, errors.New("fakerpc: unable to find single network address for " + addr.String())
+	if len(all) == 0 {
+		return nil, errors.New("fakerpc: unable to find single network address for " + addr.String())
+	}
+	return all, nil
 }
 
 type hpwrap string

@@ -35,18 +35,22 @@ type Transmission struct {
 // A Log represents communication session, either captured by a Proxy or parsed
 // from a ngrep output.
 type Log struct {
-	// Network is an address of the netwrok, in which communication took place.
-	Network net.IPNet
+	// Network is an address of the networks, in which communication took place.
+	Networks []*net.IPNet
 	// Filter is an effective pcap filter applied to the recording session.
 	Filter string
 	// T holds captured transmissions.
 	T []Transmission
 }
 
-// Net returns the network name with the mask printed in a IP form instead of
+// Net returns the network names with the mask printed in a IP form instead of
 // hexadecimal one.
-func (l *Log) Net() string {
-	return fmt.Sprintf("%v/%v", ipnil(l.Network.IP), masktoip(l.Network.Mask))
+func (l *Log) Net() []string {
+	s := make([]string, 0, len(l.Networks))
+	for _, network := range l.Networks {
+		s = append(s, fmt.Sprintf("%v/%v", ipnil(network.IP), masktoip(network.Mask)))
+	}
+	return s
 }
 
 // NewLog gives a new Log.

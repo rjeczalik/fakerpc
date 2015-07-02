@@ -106,15 +106,15 @@ func Record(lis net.Listener, callback func(*Transmission)) (net.Listener, error
 }
 
 func newRecListener(lis net.Listener, src *net.TCPAddr, rec func(*Transmission)) (l *recListener, err error) {
-	ipnet, err := ipnetaddr(lis.Addr())
+	networks, err := ipnetaddr(lis.Addr())
 	if err != nil {
 		return
 	}
 	l = &recListener{
 		log: Log{
-			Network: net.IPNet{IP: ipnet.IP, Mask: ipnet.Mask},
-			Filter:  fmt.Sprintf("(ip or ipv6) and ( host %s and port %d )", src.IP, src.Port),
-			T:       make([]Transmission, 0),
+			Networks: networks,
+			Filter:   fmt.Sprintf("(ip or ipv6) and ( host %s and port %d )", src.IP, src.Port),
+			T:        make([]Transmission, 0),
 		},
 		lis: lis,
 		src: src,

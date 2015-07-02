@@ -90,14 +90,16 @@ func NgrepUnmarshal(r io.Reader, l *Log) error {
 			}
 			line := string(b)
 			if m := headre[0].FindStringSubmatch(line); m != nil {
-				if l.Network.IP = net.ParseIP(m[1]); l.Network.IP == nil {
+				var network net.IPNet
+				if network.IP = net.ParseIP(m[1]); network.IP == nil {
 					return errors.New("ill-formed IP " + m[1])
 				}
 				mask := net.ParseIP(m[2])
 				if mask == nil {
 					return errors.New("ill-formed IP mask " + m[2])
 				}
-				l.Network.Mask = iptomask(mask)
+				network.Mask = iptomask(mask)
+				l.Networks = []*net.IPNet{&network}
 			} else if m := headre[1].FindStringSubmatch(line); m != nil {
 				l.Filter = m[1]
 			}

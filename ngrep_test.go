@@ -46,10 +46,10 @@ LIED
 `)
 
 var lexp = &Log{
-	Network: net.IPNet{
+	Networks: []*net.IPNet{{
 		IP:   net.IPv4(192, 168, 14, 0),
 		Mask: net.IPv4Mask(255, 255, 255, 0),
-	},
+	}},
 	Filter: "(ip or ip6) and ( host 192.168.16.50 and port 80 )",
 	T: []Transmission{{
 		Src: &net.TCPAddr{
@@ -149,13 +149,13 @@ func TestNgrepUnmarshal(t *testing.T) {
 	if err := NgrepUnmarshal(bytes.NewBuffer(ngrep), l); err != nil {
 		t.Fatalf("expected err=nil; was %q", err)
 	}
-	if !l.Network.IP.Equal(lexp.Network.IP) {
-		t.Errorf("expected l.Network.IP=%q; was %q", lexp.Network.IP,
-			l.Network.IP)
+	if !l.Networks[0].IP.Equal(lexp.Networks[0].IP) {
+		t.Errorf("expected l.Network.IP=%q; was %q", lexp.Networks[0].IP,
+			l.Networks[0].IP)
 	}
-	if l.Network.Mask.String() != lexp.Network.Mask.String() {
-		t.Errorf("expected l.Network.Mask=%q; was %q", lexp.Network.Mask,
-			l.Network.Mask)
+	if l.Networks[0].Mask.String() != lexp.Networks[0].Mask.String() {
+		t.Errorf("expected l.Network.Mask=%q; was %q", lexp.Networks[0].Mask,
+			l.Networks[0].Mask)
 	}
 	if len(l.T) != len(lexp.T) {
 		t.Fatalf("expected len(l.T)=%d; was %d", len(lexp.T), len(l.T))
