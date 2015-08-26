@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
 )
 
 // ErrAlreadyRunning is returned when calling ListenAndServe on a server which
@@ -23,10 +24,15 @@ var ErrNotRunning = errors.New("fakerpc: server is not running")
 // A Transmission represents a single raw data transmission between two TCP
 // end points.
 type Transmission struct {
+	// Time of the start of the transmission.
+	Time time.Time
+
 	// Src is a TCP address of the source.
 	Src *net.TCPAddr
+
 	// Dst is a TCP address of the destination.
 	Dst *net.TCPAddr
+
 	// Raw contains all the recorded bytes sent from Src to Dst until Dst began
 	// replying back to Src.
 	Raw []byte
@@ -37,10 +43,16 @@ type Transmission struct {
 type Log struct {
 	// Network is an address of the networks, in which communication took place.
 	Networks []*net.IPNet
+
 	// Filter is an effective pcap filter applied to the recording session.
 	Filter string
+
 	// T holds captured transmissions.
 	T []Transmission
+
+	// Coalesce is a maximum interval, within wihch all the writes/reads will get
+	// coalesced into single transmission.
+	Coalesce time.Duration
 }
 
 // Net returns the network names with the mask printed in a IP form instead of

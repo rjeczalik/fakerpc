@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 var noopRecord = func(*Transmission) {}
@@ -95,16 +96,22 @@ func ListenAndRecord(network, laddr string, callback func(*Transmission)) (net.L
 	return Record(lis, callback)
 }
 
-// Record records all network communication on the listener.
+// Record records all network communication on the listener. By default coalesces greedily all
+// the the writes and reads.
 //
 // On failure it closes the listener returning non-nil error.
 func Record(lis net.Listener, callback func(*Transmission)) (net.Listener, error) {
+	return RecordCoalesce(lis, callback, 0)
+}
+
+// RecordCoalesce
+func RecordCoalesce(lis net.Listener, callback func(*Transmission), colesce time.Duration) (net.Listener, error) {
 	src, err := tcpaddr(lis.Addr())
 	if err != nil {
 		lis.Close()
 		return nil, err
 	}
-	rl, err := newRecListener(lis, src, callback)
+	rl, err := newRecListener(lis, src, callback, coalesce)
 	if err != nil {
 		lis.Close()
 		return nil, err
@@ -113,7 +120,7 @@ func Record(lis net.Listener, callback func(*Transmission)) (net.Listener, error
 	return rl, nil
 }
 
-func newRecListener(lis net.Listener, src *net.TCPAddr, rec func(*Transmission)) (l *recListener, err error) {
+func newRecListener(lis net.Listener, src *net.TCPAddr, rec func(*Transmission), coalesce time.Duration) (l *recListener, err error) {
 	networks, err := ipnetaddr(lis.Addr())
 	if err != nil {
 		return
@@ -122,12 +129,13 @@ func newRecListener(lis net.Listener, src *net.TCPAddr, rec func(*Transmission))
 		log: Log{
 			Networks: networks,
 			Filter:   fmt.Sprintf("(ip or ipv6) and ( host %s and port %d )", src.IP, src.Port),
-			T:        make([]Transmission, 0),
+			Coalesce: coalesce,
 		},
-		lis: lis,
-		src: src,
-		rec: rec,
-		con: make(map[io.Closer]struct{}),
+		lis:      lis,
+		src:      src,
+		rec:      rec,
+		con:      make(map[io.Closer]struct{}),
+		coalesce: coalesce,
 	}
 	return
 }
@@ -147,7 +155,6 @@ func (rl *recListener) Accept() (net.Conn, error) {
 		t: []Transmission{{
 			Src: dst,
 			Dst: rl.src,
-			Raw: make([]byte, 0),
 		}},
 		src: rl.src,
 		dst: dst,
